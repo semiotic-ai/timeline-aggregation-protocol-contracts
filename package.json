@@ -1,0 +1,30 @@
+{
+    "name": "tap-contracts",
+    "description": "Contracts for TAP protocol for collateral",
+    "author": "Bryan Cole <bryan.cole@semiotic.ai>",
+    "license": "Apache-2.0",
+    "version": "0.0.1",
+    "files": [
+        "src/**/*.sol"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/semiotic-ai/tap-contracts.git"
+    },
+    "devDependencies": {
+        "hardhat": "^2.7.0",
+        "solhint": "^3.3.7"
+    },
+    "scripts": {
+        "install-libs": "make install-libs",
+        "update-libs": "make update-libs",
+        "install-solc": "make install-solc",
+        "lint": "make lint",
+        "build": "make build",
+        "test": "make test",
+        "gas-snapshot": "make gas-snapshot",
+        "clean": "make clean",
+        "fork-mainnet": "make fork-mainnet",
+        "chmod-scripts": "make chmod-scripts"
+    }
+}
