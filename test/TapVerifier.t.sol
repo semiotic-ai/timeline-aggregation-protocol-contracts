@@ -55,7 +55,10 @@ contract TAPVerifierTest is Test {
     }
 
     /**
-     * @notice Test case using a sampled valid ReceiptAggregationVoucher (RAV) and its signature.
+     * @notice Test case using a valid ReceiptAggregationVoucher (RAV) and its signature sampled from the Rust library.
+     * The test uses a pre-generated sample RAV and its signature, created using the same mnemonic for the signer as the
+     * signer in the test contract's setup. It then recovers the signer address from the signed RAV and asserts that it
+     * matches the expected signer address.
      */
     function testSampledValidRAV() public {
         // Sampled RAV and signature (created using the same mnemonic for the signer)
@@ -78,73 +81,98 @@ contract TAPVerifierTest is Test {
         assertEq(recovered_signer, signer);
     }
 
+
     /**
-     * @notice Test case using a sampled RAV with an invalid allocation ID.
+     * @notice Test case with an invalid allocation ID.
+     * The test modifies the allocation ID of a signed ReceiptAggregationVoucher (RAV) to an invalid value
+     * and asserts that the recovered signer is not the expected signer address.
      */
-    function testSampledRAVInvalidAllocationID() public {
-        // Sampled RAV with invalid allocation ID
-        TAPVerifier.ReceiptAggregationVoucher memory invalid_rav = TAPVerifier.ReceiptAggregationVoucher(
-            address(0x2), // Invalid allocation ID
+    function testRAVInvalidAllocationID() public {
+        // Create a ReceiptAggregationVoucher (RAV)
+        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
+            address(0x1),
             10,
             158
         );
-        (uint8 v, bytes32 r, bytes32 s) = (
-            27,
-            0x6a18671465401bf0003b88048eccefaa7c6961168d2dfd3d12b9485cb857ddca,
-            0x14b662a328daf6658364935b1f33e807b7b9f196cf51d1027038b82877cef07e
-        );
-        TAPVerifier.SignedRAV memory signed_invalid_rav = TAPVerifier.SignedRAV(invalid_rav, abi.encodePacked(r, s, v));
+
+        // Compute the digest of the RAV
+        bytes32 digest = tap_verifier.hashRAV(rav);
+
+        // Sign the digest using the signer's private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
+
+        // Change the allocation ID of the RAV to invalid value
+        rav.allocationId = address(20);
+
+        // Create a SignedRAV structure with the RAV and its signature
+        TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
 
         // Recover the signer address from the signed RAV
-        address recovered_signer = tap_verifier.recoverRAVSigner(signed_invalid_rav);
+        address recovered_signer = tap_verifier.recoverRAVSigner(signed_rav);
 
         // Assert that the recovered signer is not the same as the expected signer address
         assertFalse(recovered_signer == signer);
     }
 
     /**
-     * @notice Test case using a sampled RAV with an invalid timestamp.
+     * @notice Test case with an invalid Timestamp.
+     * The test modifies the Timestamp of a signed ReceiptAggregationVoucher (RAV) to an invalid value
+     * and asserts that the recovered signer is not the expected signer address.
      */
-    function testSampledRAVInvalidTimestamp() public {
-        // Sampled RAV with invalid timestamp
-        TAPVerifier.ReceiptAggregationVoucher memory invalid_rav = TAPVerifier.ReceiptAggregationVoucher(
+    function testRAVInvalidTimestamp() public {
+        // Create a ReceiptAggregationVoucher (RAV)
+        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
             address(0x1),
-            20, // Invalid timestamp
+            10,
             158
         );
-        (uint8 v, bytes32 r, bytes32 s) = (
-            27,
-            0x6a18671465401bf0003b88048eccefaa7c6961168d2dfd3d12b9485cb857ddca,
-            0x14b662a328daf6658364935b1f33e807b7b9f196cf51d1027038b82877cef07e
-        );
-        TAPVerifier.SignedRAV memory signed_invalid_rav = TAPVerifier.SignedRAV(invalid_rav, abi.encodePacked(r, s, v));
+
+        // Compute the digest of the RAV
+        bytes32 digest = tap_verifier.hashRAV(rav);
+
+        // Sign the digest using the signer's private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
+
+        // Change the timestamp of the RAV to invalid value
+        rav.timestampNs = 100;
+
+        // Create a SignedRAV structure with the RAV and its signature
+        TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
 
         // Recover the signer address from the signed RAV
-        address recovered_signer = tap_verifier.recoverRAVSigner(signed_invalid_rav);
+        address recovered_signer = tap_verifier.recoverRAVSigner(signed_rav);
 
         // Assert that the recovered signer is not the same as the expected signer address
         assertFalse(recovered_signer == signer);
     }
 
     /**
-     * @notice Test case using a sampled RAV with an invalid value aggregate.
+     * @notice Test case with an invalid value aggregate.
+     * The test modifies the value aggregate of a signed ReceiptAggregationVoucher (RAV) to an invalid value
+     * and asserts that the recovered signer is not the expected signer address.
      */
-    function testSampledRAVInvalidValueAggregate() public {
-        // Sampled RAV with invalid value aggregate
-        TAPVerifier.ReceiptAggregationVoucher memory invalid_rav = TAPVerifier.ReceiptAggregationVoucher(
+    function testRAVInvalidValueAggregate() public {
+        // Create a ReceiptAggregationVoucher (RAV)
+        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
             address(0x1),
             10,
-            200 // Invalid value aggregate
+            158
         );
-        (uint8 v, bytes32 r, bytes32 s) = (
-            27,
-            0x6a18671465401bf0003b88048eccefaa7c6961168d2dfd3d12b9485cb857ddca,
-            0x14b662a328daf6658364935b1f33e807b7b9f196cf51d1027038b82877cef07e
-        );
-        TAPVerifier.SignedRAV memory signed_invalid_rav = TAPVerifier.SignedRAV(invalid_rav, abi.encodePacked(r, s, v));
+
+        // Compute the digest of the RAV
+        bytes32 digest = tap_verifier.hashRAV(rav);
+
+        // Sign the digest using the signer's private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
+
+        // Change the value aggregate of the RAV to invalid value
+        rav.valueAggregate = 100;
+
+        // Create a SignedRAV structure with the RAV and its signature
+        TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
 
         // Recover the signer address from the signed RAV
-        address recovered_signer = tap_verifier.recoverRAVSigner(signed_invalid_rav);
+        address recovered_signer = tap_verifier.recoverRAVSigner(signed_rav);
 
         // Assert that the recovered signer is not the same as the expected signer address
         assertFalse(recovered_signer == signer);
@@ -186,11 +214,11 @@ contract TAPVerifierTest is Test {
             0,
             0
         );
-        bytes32 digest1 = tap_verifier.hashRAV(rav);
-        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(signerPrivateKey, digest1);
-        TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r1, s1, v1));
-        address recovered_signer1 = tap_verifier.recoverRAVSigner(signed_rav);
-        assertEq(recovered_signer1, signer);
+        bytes32 digest = tap_verifier.hashRAV(rav);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
+        TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
+        address recovered_signer = tap_verifier.recoverRAVSigner(signed_rav);
+        assertEq(recovered_signer, signer);
     }
 
     /**
@@ -205,10 +233,10 @@ contract TAPVerifierTest is Test {
             type(uint64).max,
             type(uint128).max
         );
-        bytes32 digest2 = tap_verifier.hashRAV(rav);
-        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(signerPrivateKey, digest2);
-        TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r2, s2, v2));
-        address recovered_signer2 = tap_verifier.recoverRAVSigner(signed_rav);
-        assertEq(recovered_signer2, signer);
+        bytes32 digest = tap_verifier.hashRAV(rav);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
+        TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
+        address recovered_signer = tap_verifier.recoverRAVSigner(signed_rav);
+        assertEq(recovered_signer, signer);
     }
 }
