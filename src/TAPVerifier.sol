@@ -13,9 +13,9 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
  */
 contract TAPVerifier is EIP712 {
     struct ReceiptAggregationVoucher {
-        address allocationID;
-        uint64 timestamp_ns;
-        uint128 value_aggregate;
+        address allocationId;
+        uint64 timestampNs;
+        uint128 valueAggregate;
     }
 
     struct SignedRAV {
@@ -51,9 +51,9 @@ contract TAPVerifier is EIP712 {
             keccak256(
                 abi.encode(
                     RAV_TYPEHASH,
-                    _rav.allocationID,
-                    _rav.timestamp_ns,
-                    _rav.value_aggregate
+                    _rav.allocationId,
+                    _rav.timestampNs,
+                    _rav.valueAggregate
                 )
             )
         );
