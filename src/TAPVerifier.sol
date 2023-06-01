@@ -6,9 +6,11 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-import "forge-std/console.sol";
-import "forge-std/Test.sol";
 
+/**
+ * @title TAPVerifier
+ * @dev A contract for verifying receipt aggregation vouchers.
+ */
 contract TAPVerifier is EIP712 {
     struct ReceiptAggregationVoucher {
         address allocationID;
@@ -16,29 +18,39 @@ contract TAPVerifier is EIP712 {
         uint128 value_aggregate;
     }
 
-    struct SignedRAV{
+    struct SignedRAV {
         ReceiptAggregationVoucher rav;
-        // 65 bytes: r (32 Bytes) || s (32 Bytes) || v (1 Byte)
-        bytes signature;
+        bytes signature; // 65 bytes: r (32 Bytes) || s (32 Bytes) || v (1 Byte)
     }
 
-    // --- For EIP 712 ---
-    bytes32 private constant RAV_TYPE_HASH =
+    // --- EIP 712 ---
+    bytes32 private constant RAV_TYPEHASH =
         keccak256("ReceiptAggregateVoucher(address allocationId,uint64 timestampNs,uint128 valueAggregate)");
 
-
+    /**
+     * @dev Constructs a new instance of the TAPVerifier contract.
+     */
     constructor() EIP712("TAP", "1.0.0") {}
-
-    function recoverRAVSigner(SignedRAV memory _signed_rav)public view returns(address){
-        bytes32 messageHash = HashRAV(_signed_rav.rav);
-        return ECDSA.recover(messageHash, _signed_rav.signature);
+    /**
+     * @dev Recovers the signer address of a signed ReceiptAggregationVoucher (RAV).
+     * @param _signedRAV The SignedRAV containing the RAV and its signature.
+     * @return The address of the signer.
+     */
+    function recoverRAVSigner(SignedRAV memory _signedRAV) public view returns (address) {
+        bytes32 messageHash = hashRAV(_signedRAV.rav);
+        return ECDSA.recover(messageHash, _signedRAV.signature);
     }
 
-    function HashRAV(ReceiptAggregationVoucher memory _rav)public view returns(bytes32){
+    /**
+     * @dev Computes the hash of a ReceiptAggregationVoucher (RAV).
+     * @param _rav The RAV for which to compute the hash.
+     * @return The hash of the RAV.
+     */
+    function hashRAV(ReceiptAggregationVoucher memory _rav) public view returns (bytes32) {
         return _hashTypedDataV4(
-                keccak256(
+            keccak256(
                 abi.encode(
-                    RAV_TYPE_HASH,
+                    RAV_TYPEHASH,
                     _rav.allocationID,
                     _rav.timestamp_ns,
                     _rav.value_aggregate

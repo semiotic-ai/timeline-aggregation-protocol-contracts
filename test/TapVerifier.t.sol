@@ -34,7 +34,7 @@ contract TAPVerifierTest is Test {
             10,
             158
         );
-        bytes32 digest = tap_verifier.HashRAV(rav);
+        bytes32 digest = tap_verifier.hashRAV(rav);
 
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
 
