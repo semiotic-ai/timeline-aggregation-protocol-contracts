@@ -31,10 +31,12 @@ contract TAPVerifier is EIP712 {
      * @dev Constructs a new instance of the TAPVerifier contract.
      */
     constructor() EIP712("TAP", "1.0.0") {}
+
     /**
      * @dev Recovers the signer address of a signed ReceiptAggregationVoucher (RAV).
      * @param _signedRAV The SignedRAV containing the RAV and its signature.
      * @return The address of the signer.
+     * @notice REVERT: This function may revert if ECDSA.recover fails, check ECDSA library for details.
      */
     function recoverRAVSigner(SignedRAV memory _signedRAV) public view returns (address) {
         bytes32 messageHash = hashRAV(_signedRAV.rav);
