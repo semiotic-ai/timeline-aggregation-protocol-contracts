@@ -17,9 +17,6 @@ contract TAPVerifierTest is Test {
 
     function setUp() public {
         tap_verifier = new TAPVerifier();
-        bytes memory code = address(tap_verifier).code;
-        address targetAddr = address(1);
-        vm.etch(targetAddr, code);
 
         // Set up the signer for testing purposes
         string memory signerMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
