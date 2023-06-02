@@ -6,7 +6,6 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
-
 /**
  * @title TAPVerifier
  * @dev A contract for verifying receipt aggregation vouchers.
@@ -61,14 +60,7 @@ contract TAPVerifier is EIP712 {
      */
     function hashRAV(ReceiptAggregationVoucher memory _rav) public view returns (bytes32) {
         return _hashTypedDataV4(
-            keccak256(
-                abi.encode(
-                    RAV_TYPEHASH,
-                    _rav.allocationId,
-                    _rav.timestampNs,
-                    _rav.valueAggregate
-                )
-            )
+            keccak256(abi.encode(RAV_TYPEHASH, _rav.allocationId, _rav.timestampNs, _rav.valueAggregate))
         );
     }
 }

@@ -19,7 +19,8 @@ contract TAPVerifierTest is Test {
         tap_verifier = new TAPVerifier();
 
         // Set up the signer for testing purposes
-        string memory signerMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        string memory signerMnemonic =
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
         signerPrivateKey = vm.deriveKey(signerMnemonic, 0);
         signer = vm.addr(signerPrivateKey);
     }
@@ -29,11 +30,7 @@ contract TAPVerifierTest is Test {
      */
     function testRecoverSignature() public {
         // Create a sample ReceiptAggregationVoucher (RAV)
-        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
-            address(0x1),
-            10,
-            158
-        );
+        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(address(0x1), 10, 158);
 
         // Compute the digest of the RAV
         bytes32 digest = tap_verifier.hashRAV(rav);
@@ -59,11 +56,7 @@ contract TAPVerifierTest is Test {
      */
     function testSampledValidRAV() public {
         // Sampled RAV and signature (created using the same mnemonic for the signer)
-        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
-            address(0x1),
-            10,
-            158
-        );
+        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(address(0x1), 10, 158);
         (uint8 v, bytes32 r, bytes32 s) = (
             27,
             0x6a18671465401bf0003b88048eccefaa7c6961168d2dfd3d12b9485cb857ddca,
@@ -78,7 +71,6 @@ contract TAPVerifierTest is Test {
         assertEq(recovered_signer, signer);
     }
 
-
     /**
      * @notice Test case with an invalid allocation ID.
      * The test modifies the allocation ID of a signed ReceiptAggregationVoucher (RAV) to an invalid value
@@ -86,11 +78,7 @@ contract TAPVerifierTest is Test {
      */
     function testRAVInvalidAllocationID() public {
         // Create a ReceiptAggregationVoucher (RAV)
-        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
-            address(0x1),
-            10,
-            158
-        );
+        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(address(0x1), 10, 158);
 
         // Compute the digest of the RAV
         bytes32 digest = tap_verifier.hashRAV(rav);
@@ -118,11 +106,7 @@ contract TAPVerifierTest is Test {
      */
     function testRAVInvalidTimestamp() public {
         // Create a ReceiptAggregationVoucher (RAV)
-        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
-            address(0x1),
-            10,
-            158
-        );
+        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(address(0x1), 10, 158);
 
         // Compute the digest of the RAV
         bytes32 digest = tap_verifier.hashRAV(rav);
@@ -150,11 +134,7 @@ contract TAPVerifierTest is Test {
      */
     function testRAVInvalidValueAggregate() public {
         // Create a ReceiptAggregationVoucher (RAV)
-        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
-            address(0x1),
-            10,
-            158
-        );
+        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(address(0x1), 10, 158);
 
         // Compute the digest of the RAV
         bytes32 digest = tap_verifier.hashRAV(rav);
@@ -182,11 +162,7 @@ contract TAPVerifierTest is Test {
      */
     function testInvalidSignature() public {
         // Create a sample ReceiptAggregationVoucher (RAV)
-        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
-            address(0x1),
-            10,
-            158
-        );
+        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(address(0x1), 10, 158);
 
         // Create an invalid signature (e.g., tampered with or incorrect)
         (uint8 v, bytes32 r, bytes32 s) = (27, bytes32(0), bytes32(0));
@@ -206,11 +182,7 @@ contract TAPVerifierTest is Test {
      */
     function testEdgeCaseMinValuedRav() public {
         // Test with minimum values for timestamp_ns and value_aggregate
-        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
-            address(0x1),
-            0,
-            0
-        );
+        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(address(0x1), 0, 0);
         bytes32 digest = tap_verifier.hashRAV(rav);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
         TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
@@ -225,11 +197,8 @@ contract TAPVerifierTest is Test {
      */
     function testEdgeCaseMaxValuedRav() public {
         // Test with maximum values for timestamp_ns and value_aggregate
-        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(
-            address(0x1),
-            type(uint64).max,
-            type(uint128).max
-        );
+        TAPVerifier.ReceiptAggregationVoucher memory rav =
+            TAPVerifier.ReceiptAggregationVoucher(address(0x1), type(uint64).max, type(uint128).max);
         bytes32 digest = tap_verifier.hashRAV(rav);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, digest);
         TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
