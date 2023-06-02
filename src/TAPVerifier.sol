@@ -44,6 +44,17 @@ contract TAPVerifier is EIP712 {
     }
 
     /**
+     * @dev Compares address recovered from signature to provided address.
+     * @param _signedRAV The SignedRAV containing the RAV and its signature.
+     * @param _address The address to compare the recovered address to.
+     * @return True if the recovered address matches the provided address, false otherwise.
+     * @notice REVERT: This function may revert if ECDSA.recover fails, check ECDSA library for details.
+     */
+    function verifyRAVSignature(SignedRAV memory _signedRAV, address _address) public view returns (bool) {
+        return recoverRAVSigner(_signedRAV) == _address;
+    }
+
+    /**
      * @dev Computes the hash of a ReceiptAggregationVoucher (RAV).
      * @param _rav The RAV for which to compute the hash.
      * @return The hash of the RAV.
