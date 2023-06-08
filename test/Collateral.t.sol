@@ -8,11 +8,11 @@ import {TAPVerifier} from "../src/TAPVerifier.sol";
 import {Collateral} from "../src/Collateral.sol";
 import {MockERC20Token} from "./MockERC20Token.sol";
 
-contract CollateralContractTest is Test{
-    address constant private RECEIVER_ADDRESS = address(0x123);
-    address constant private SENDER_ADDRESS = address(0x789);
-    uint256 constant private COLLATERAL_AMOUNT = 1000;
-    uint256 constant private FREEZE_PERIOD = 800;
+contract CollateralContractTest is Test {
+    address private constant RECEIVER_ADDRESS = address(0x123);
+    address private constant SENDER_ADDRESS = address(0x789);
+    uint256 private constant COLLATERAL_AMOUNT = 1000;
+    uint256 private constant FREEZE_PERIOD = 800;
 
     MockERC20Token private mockERC20;
     Collateral private collateralContract;
@@ -20,7 +20,6 @@ contract CollateralContractTest is Test{
 
     uint256 internal authorizedSignerPrivateKey;
     address internal authorizedsigner;
-
 
     function setUp() public {
         // Create an instance of the TAPVerifier contract
@@ -30,7 +29,7 @@ contract CollateralContractTest is Test{
         mockERC20 = new MockERC20Token(1000000000);
 
         // give sender tokens
-        mockERC20.transfer(SENDER_ADDRESS, 10000000);
+        assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
 
         collateralContract = new Collateral(address(mockERC20), address(tap_verifier), FREEZE_PERIOD);
 
@@ -90,7 +89,8 @@ contract CollateralContractTest is Test{
 
         // Create a RAV
         uint128 RAVAggregateAmount = 158;
-        TAPVerifier.ReceiptAggregationVoucher memory rav = TAPVerifier.ReceiptAggregationVoucher(address(0x1), 10, RAVAggregateAmount);
+        TAPVerifier.ReceiptAggregationVoucher memory rav =
+            TAPVerifier.ReceiptAggregationVoucher(address(0x1), 10, RAVAggregateAmount);
         bytes32 digest = tap_verifier.hashRAV(rav);
 
         // Sign the digest using the authorized signer's private key
@@ -108,7 +108,9 @@ contract CollateralContractTest is Test{
 
         // get number of tokens in receiver's account after redeeming and check that it increased by the RAV amount
         uint256 receiverBalanceAfter = mockERC20.balanceOf(RECEIVER_ADDRESS);
-        assertEq(receiverBalanceAfter, receiverBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
+        assertEq(
+            receiverBalanceAfter, receiverBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming"
+        );
     }
 
     function testGetCollateralAmount() public {
@@ -141,7 +143,7 @@ contract CollateralContractTest is Test{
         // print when first thaw request is thawed
         emit log_named_uint("block number when first thaw request is thawed", block.number + FREEZE_PERIOD);
 
-        for(uint256 i=0; i < 10; i++) {
+        for (uint256 i = 0; i < 10; i++) {
             // Sets msg.sender address for next contract calls until stop is called
             collateralContract.thawCollateral(RECEIVER_ADDRESS, partialCollateralAmount);
 
@@ -150,7 +152,6 @@ contract CollateralContractTest is Test{
         }
         // print block number after multiple thaw requests
         emit log_named_uint("block number after multiple thaw requests", block.number);
-
 
         // expected to revert because not enough time has passed since the last thaw request
         vm.expectRevert("Collateral still thawing");

@@ -21,10 +21,9 @@ import "forge-std/console.sol";
  */
 contract Collateral {
     struct CollateralAccount {
-        uint256 balance;        // Total collateral balance for a sender-receiver pair
-
-        uint256 amountThawing;  // Amount of collateral currently being thawed
-        uint256 thawEnd;        // Block number at which thawing period ends
+        uint256 balance; // Total collateral balance for a sender-receiver pair
+        uint256 amountThawing; // Amount of collateral currently being thawed
+        uint256 thawEnd; // Block number at which thawing period ends
     }
 
     // Stores how much collateral each sender has deposited for each receiver, as well as thawing information
@@ -34,13 +33,13 @@ contract Collateral {
     mapping(address => address) private authorizedSigners;
 
     // The ERC20 token used for collateral
-    IERC20 public collateralToken;
+    IERC20 public immutable collateralToken;
 
     // The contract used for verifying receipt aggregate vouchers
-    TAPVerifier public tapVerifier;
+    TAPVerifier public immutable tapVerifier;
 
     // The duration in which collateral funds are thawing before they can be withdrawn
-    uint256 public thawingPeriod;
+    uint256 public immutable thawingPeriod;
 
     /**
      * @dev Emitted when collateral is deposited for a receiver.
@@ -67,31 +66,31 @@ contract Collateral {
      */
     event AuthorizeSigner(address indexed signer, address indexed sender);
 
-    constructor(address _collateralToken, address _tapVerifier, uint256 _thawingPeriod) {
-        collateralToken = IERC20(_collateralToken);
-        tapVerifier = TAPVerifier(_tapVerifier);
-        thawingPeriod = _thawingPeriod;
+    constructor(address collateralToken_, address tapVerifier_, uint256 thawingPeriod_) {
+        collateralToken = IERC20(collateralToken_);
+        tapVerifier = TAPVerifier(tapVerifier_);
+        thawingPeriod = thawingPeriod_;
     }
 
     /**
      * @dev Deposits collateral for a receiver.
-     * @param _receiver Address of the receiver.
-     * @param _amount Amount of collateral to deposit.
+     * @param receiver Address of the receiver.
+     * @param amount Amount of collateral to deposit.
      */
-    function depositCollateral(address _receiver, uint256 _amount) external {
-        collateralToken.transferFrom(msg.sender, address(this), _amount);
-        collateralAccounts[msg.sender][_receiver].balance += _amount;
-        emit Deposit(msg.sender, _receiver, _amount);
+    function depositCollateral(address receiver, uint256 amount) external {
+        collateralAccounts[msg.sender][receiver].balance += amount;
+        emit Deposit(msg.sender, receiver, amount);
+        require(collateralToken.transferFrom(msg.sender, address(this), amount));
     }
 
     /**
      * @dev Requests to thaw a specific amount of collateral from a receivers collateral account.
-     * @param _receiver Address of the receiver the collateral account is for.
-     * @param _amount Amount of collateral to thaw.
+     * @param receiver Address of the receiver the collateral account is for.
+     * @param amount Amount of collateral to thaw.
      */
-    function thawCollateral(address _receiver, uint256 _amount) external {
-        CollateralAccount storage account = collateralAccounts[msg.sender][_receiver];
-        uint256 totalThawingRequested = account.amountThawing + _amount;
+    function thawCollateral(address receiver, uint256 amount) external {
+        CollateralAccount storage account = collateralAccounts[msg.sender][receiver];
+        uint256 totalThawingRequested = account.amountThawing + amount;
         require(account.balance >= totalThawingRequested, "Insufficient collateral balance");
 
         // Increase the amount being thawed
@@ -99,15 +98,15 @@ contract Collateral {
         // Set when the thaw is complete (thawing period number of blocks after current block)
         account.thawEnd = block.number + thawingPeriod;
 
-        emit ThawRequest(msg.sender, _receiver, _amount, account.thawEnd);
+        emit ThawRequest(msg.sender, receiver, amount, account.thawEnd);
     }
 
     /**
      * @dev Withdraws all thawed collateral from a receivers collateral account.
-     * @param _receiver Address of the receiver.
+     * @param receiver Address of the receiver.
      */
-    function withdrawThawedCollateral(address _receiver) external {
-        CollateralAccount storage account = collateralAccounts[msg.sender][_receiver];
+    function withdrawThawedCollateral(address receiver) external {
+        CollateralAccount storage account = collateralAccounts[msg.sender][receiver];
         require(account.thawEnd != 0, "No collateral thawing");
         require(account.thawEnd <= block.number, "Collateral still thawing");
 
@@ -115,61 +114,61 @@ contract Collateral {
         uint256 amount = account.amountThawing > account.balance ? account.balance : account.amountThawing;
 
         unchecked {
-            account.balance -= amount;  // Reduce the balance by the withdrawn amount (no underflow risk)
+            account.balance -= amount; // Reduce the balance by the withdrawn amount (no underflow risk)
         }
         account.amountThawing = 0;
         account.thawEnd = 0;
-        emit Withdraw(msg.sender, _receiver, amount);
-        collateralToken.transfer(msg.sender, amount);
+        emit Withdraw(msg.sender, receiver, amount);
+        require(collateralToken.transfer(msg.sender, amount));
     }
 
     /**
      * @dev Authorizes a signer to sign RAVs for the sender.
-     * @param _signer Address of the authorized signer.
+     * @param signer Address of the authorized signer.
      */
-    function authorizeSigner(address _signer) external {
-        require(authorizedSigners[_signer] == address(0), "Signer already authorized");
-        authorizedSigners[_signer] = msg.sender;
-        emit AuthorizeSigner(_signer, msg.sender);
+    function authorizeSigner(address signer) external {
+        require(authorizedSigners[signer] == address(0), "Signer already authorized");
+        authorizedSigners[signer] = msg.sender;
+        emit AuthorizeSigner(signer, msg.sender);
     }
 
     /**
      * @dev Redeems collateral for a receiver using a signed RAV.
-     * @param _signedRAV Signed RAV containing the receiver and collateral amount.
+     * @param signedRAV Signed RAV containing the receiver and collateral amount.
      */
-    function redeem(TAPVerifier.SignedRAV memory _signedRAV) external {
-        address signer = tapVerifier.recoverRAVSigner(_signedRAV);
+    function redeem(TAPVerifier.SignedRAV memory signedRAV) external {
+        address signer = tapVerifier.recoverRAVSigner(signedRAV);
         require(authorizedSigners[signer] != address(0), "Signer not authorized");
 
         address sender = authorizedSigners[signer];
         address receiver = msg.sender;
-        uint256 amount = _signedRAV.rav.valueAggregate;
+        uint256 amount = signedRAV.rav.valueAggregate;
         uint256 availableCollateral = collateralAccounts[sender][receiver].balance;
         require(availableCollateral >= amount, "Insufficient collateral balance");
         unchecked {
             availableCollateral -= amount;
         }
         emit Redeem(msg.sender, amount);
-        collateralToken.transfer(msg.sender, amount);
+        require(collateralToken.transfer(msg.sender, amount));
     }
 
     /**
      * @dev Retrieves the amount of collateral deposited by a sender for a receiver.
-     * @param _sender Address of the sender.
-     * @param _receiver Address of the receiver.
+     * @param sender Address of the sender.
+     * @param receiver Address of the receiver.
      * @return The amount of collateral deposited.
      */
-    function getCollateralAmount(address _sender, address _receiver) external view returns (uint256) {
-        return collateralAccounts[_sender][_receiver].balance;
+    function getCollateralAmount(address sender, address receiver) external view returns (uint256) {
+        return collateralAccounts[sender][receiver].balance;
     }
 
     /**
      * @dev Retrieves the collateral account details for a sender-receiver pair.
-     * @param _sender Address of the sender.
-     * @param _receiver Address of the receiver.
+     * @param sender Address of the sender.
+     * @param receiver Address of the receiver.
      * @return The collateral account details.
      */
-    function getCollateralAccount(address _sender, address _receiver) external view returns (CollateralAccount memory) {
-        return collateralAccounts[_sender][_receiver];
+    function getCollateralAccount(address sender, address receiver) external view returns (CollateralAccount memory) {
+        return collateralAccounts[sender][receiver];
     }
 }
