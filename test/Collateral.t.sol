@@ -82,6 +82,8 @@ contract CollateralContractTest is Test {
 
     function testRedeemRAVSignedByAuthorizedSigner() public {
         depositCollateral(SENDER_ADDRESS, RECEIVER_ADDRESS, COLLATERAL_AMOUNT);
+        uint256 remainingCollateral = collateralContract.getCollateralAmount(SENDER_ADDRESS, RECEIVER_ADDRESS);
+        assertEq(remainingCollateral, COLLATERAL_AMOUNT, "Incorrect remaining collateral");
 
         // Authorize the signer
         vm.prank(SENDER_ADDRESS);
@@ -106,6 +108,14 @@ contract CollateralContractTest is Test {
         vm.prank(RECEIVER_ADDRESS);
         collateralContract.redeem(signed_rav);
 
+        remainingCollateral -= RAVAggregateAmount;
+
+        assertEq(
+            collateralContract.getCollateralAmount(SENDER_ADDRESS, RECEIVER_ADDRESS),
+            remainingCollateral,
+            "Incorrect remaining collateral"
+        );
+
         // get number of tokens in receiver's account after redeeming and check that it increased by the RAV amount
         uint256 receiverBalanceAfter = mockERC20.balanceOf(RECEIVER_ADDRESS);
         assertEq(
@@ -129,7 +139,6 @@ contract CollateralContractTest is Test {
         vm.stopPrank();
     }
 
-    // create test to check multiple thaw requests for the same receiver doesn't finish thawing until the last thaw request freeze period has passed
     function testMultipleThawRequests() public {
         depositCollateral(SENDER_ADDRESS, RECEIVER_ADDRESS, COLLATERAL_AMOUNT);
         uint256 partialCollateralAmount = COLLATERAL_AMOUNT / 10;
@@ -138,11 +147,6 @@ contract CollateralContractTest is Test {
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(SENDER_ADDRESS);
 
-        // print block number before multiple thaw requests
-        emit log_named_uint("block number before multiple thaw requests", block.number);
-        // print when first thaw request is thawed
-        emit log_named_uint("block number when first thaw request is thawed", block.number + FREEZE_PERIOD);
-
         for (uint256 i = 0; i < 10; i++) {
             // Sets msg.sender address for next contract calls until stop is called
             collateralContract.thawCollateral(RECEIVER_ADDRESS, partialCollateralAmount);
@@ -150,8 +154,6 @@ contract CollateralContractTest is Test {
             // Simulate passing partial freeze period
             vm.roll(block.number + partialFreezePeriod);
         }
-        // print block number after multiple thaw requests
-        emit log_named_uint("block number after multiple thaw requests", block.number);
 
         // expected to revert because not enough time has passed since the last thaw request
         vm.expectRevert("Collateral still thawing");

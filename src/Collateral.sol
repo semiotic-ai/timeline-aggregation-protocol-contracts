@@ -143,11 +143,11 @@ contract Collateral {
         address sender = authorizedSigners[signer];
         address receiver = msg.sender;
         uint256 amount = signedRAV.rav.valueAggregate;
-        uint256 availableCollateral = collateralAccounts[sender][receiver].balance;
-        require(availableCollateral >= amount, "Insufficient collateral balance");
+        require(collateralAccounts[sender][receiver].balance >= amount, "Insufficient collateral balance");
         unchecked {
-            availableCollateral -= amount;
+            collateralAccounts[sender][receiver].balance -= amount;
         }
+
         emit Redeem(msg.sender, amount);
         require(collateralToken.transfer(msg.sender, amount));
     }
