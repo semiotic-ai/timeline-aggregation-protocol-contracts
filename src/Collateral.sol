@@ -5,6 +5,7 @@ pragma solidity ^0.8.13;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {TAPVerifier} from "./TAPVerifier.sol";
+import {AllocationIDTracker} from "./AllocationIDTracker.sol";
 
 import "forge-std/console.sol";
 
@@ -38,6 +39,9 @@ contract Collateral {
     // The contract used for verifying receipt aggregate vouchers
     TAPVerifier public immutable tapVerifier;
 
+    // The contract used for tracking used allocation IDs
+    AllocationIDTracker public immutable allocationIDTracker;
+
     // The duration in which collateral funds are thawing before they can be withdrawn
     uint256 public immutable thawingPeriod;
 
@@ -66,9 +70,10 @@ contract Collateral {
      */
     event AuthorizeSigner(address indexed signer, address indexed sender);
 
-    constructor(address collateralToken_, address tapVerifier_, uint256 thawingPeriod_) {
+    constructor(address collateralToken_, address tapVerifier_, address allocationIDTracker_, uint256 thawingPeriod_) {
         collateralToken = IERC20(collateralToken_);
         tapVerifier = TAPVerifier(tapVerifier_);
+        allocationIDTracker = AllocationIDTracker(allocationIDTracker_);
         thawingPeriod = thawingPeriod_;
     }
 
@@ -161,6 +166,7 @@ contract Collateral {
         }
 
         emit Redeem(msg.sender, amount);
+        allocationIDTracker.useAllocationID(signedRAV.rav.allocationId);
         require(collateralToken.transfer(msg.sender, amount));
     }
 

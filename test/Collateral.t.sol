@@ -7,6 +7,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {TAPVerifier} from "../src/TAPVerifier.sol";
 import {Collateral} from "../src/Collateral.sol";
 import {MockERC20Token} from "./MockERC20Token.sol";
+import {AllocationIDTracker} from "../src/AllocationIDTracker.sol";
 
 contract CollateralContractTest is Test {
     address private constant RECEIVER_ADDRESS = address(0x123);
@@ -28,10 +29,13 @@ contract CollateralContractTest is Test {
         // set up mock ERC20 token
         mockERC20 = new MockERC20Token(1000000000);
 
+        // set up allocation ID tracker
+        AllocationIDTracker allocationIDTracker = new AllocationIDTracker();
+
         // give sender tokens
         assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
 
-        collateralContract = new Collateral(address(mockERC20), address(tap_verifier), FREEZE_PERIOD);
+        collateralContract = new Collateral(address(mockERC20), address(tap_verifier), address(allocationIDTracker), FREEZE_PERIOD);
 
         // Set up the signer to be authorized for signing rav's
         string memory signerMnemonic =
@@ -172,5 +176,62 @@ contract CollateralContractTest is Test {
         assertEq(remainingAmount, 0, "Incorrect remaining amount");
         // Stop setting msg.sender address for any remaining contract calls
         vm.stopPrank();
+    }
+
+    // test that the contract reverts when allocation ID is used more than once
+    function testRevertOnDuplicateAllocationID() public {
+        depositCollateral(SENDER_ADDRESS, RECEIVER_ADDRESS, COLLATERAL_AMOUNT);
+        uint256 remainingCollateral = collateralContract.getCollateralAmount(SENDER_ADDRESS, RECEIVER_ADDRESS);
+        assertEq(remainingCollateral, COLLATERAL_AMOUNT, "Incorrect remaining collateral");
+
+        // Authorize the signer
+        vm.prank(SENDER_ADDRESS);
+        collateralContract.authorizeSigner(authorizedsigner);
+
+        // Create a RAV
+        uint128 RAVAggregateAmount = 158;
+        TAPVerifier.ReceiptAggregationVoucher memory rav =
+            TAPVerifier.ReceiptAggregationVoucher(address(0x1), 10, RAVAggregateAmount);
+        bytes32 digest = tap_verifier.hashRAV(rav);
+
+        // Sign the digest using the authorized signer's private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(authorizedSignerPrivateKey, digest);
+
+        // Create a SignedRAV structure with the RAV and its signature
+        TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
+
+        // get number of tokens in receiver's account before redeeming
+        uint256 receiverBalance = mockERC20.balanceOf(RECEIVER_ADDRESS);
+
+        // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
+        vm.prank(RECEIVER_ADDRESS);
+        collateralContract.redeem(signed_rav);
+
+        remainingCollateral -= RAVAggregateAmount;
+
+        // get number of tokens in receiver's account after redeeming and check that it increased by the RAV amount
+        uint256 receiverBalanceAfter = mockERC20.balanceOf(RECEIVER_ADDRESS);
+        assertEq(
+            receiverBalanceAfter, receiverBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming"
+        );
+
+
+        assertEq(
+            collateralContract.getCollateralAmount(SENDER_ADDRESS, RECEIVER_ADDRESS),
+            remainingCollateral,
+            "Incorrect remaining amount"
+        );
+
+        // expect revert when trying to redeem with the same allocation ID
+        vm.expectRevert("Allocation ID already used");
+        vm.prank(RECEIVER_ADDRESS);
+        collateralContract.redeem(signed_rav);
+
+        // remaining collateral should not have changed
+        assertEq(
+            collateralContract.getCollateralAmount(SENDER_ADDRESS, RECEIVER_ADDRESS),
+            remainingCollateral,
+            "Incorrect remaining amount"
+        );
     }
 }
