@@ -76,6 +76,8 @@ contract Collateral {
      * @dev Deposits collateral for a receiver.
      * @param receiver Address of the receiver.
      * @param amount Amount of collateral to deposit.
+     * @notice The collateral must be approved for transfer by the sender.
+     * @notice REVERT: this function will revert if the collateral transfer fails.
      */
     function depositCollateral(address receiver, uint256 amount) external {
         collateralAccounts[msg.sender][receiver].balance += amount;
@@ -87,6 +89,8 @@ contract Collateral {
      * @dev Requests to thaw a specific amount of collateral from a receivers collateral account.
      * @param receiver Address of the receiver the collateral account is for.
      * @param amount Amount of collateral to thaw.
+     * @notice REVERT: this function will revert if the sender receiver collateral account does
+     *                 not have enough collateral (greater than `amount`).
      */
     function thawCollateral(address receiver, uint256 amount) external {
         CollateralAccount storage account = collateralAccounts[msg.sender][receiver];
@@ -104,6 +108,9 @@ contract Collateral {
     /**
      * @dev Withdraws all thawed collateral from a receivers collateral account.
      * @param receiver Address of the receiver.
+     * @notice REVERT: this function will revert if the sender receiver collateral account does
+     *                not have any thawed collateral. This function will also revert if no thawing
+     *               period has been completed.
      */
     function withdrawThawedCollateral(address receiver) external {
         CollateralAccount storage account = collateralAccounts[msg.sender][receiver];
@@ -135,6 +142,11 @@ contract Collateral {
     /**
      * @dev Redeems collateral for a receiver using a signed RAV.
      * @param signedRAV Signed RAV containing the receiver and collateral amount.
+     * @notice REVERT: this function will revert if:
+     *                  - the signer is not authorized to sign for a sender.
+     *                  - the sender receiver collateral account does not have enough
+     *                    collateral (greater than the amount in the RAV).
+     *                  - the allocation ID has already been used.
      */
     function redeem(TAPVerifier.SignedRAV memory signedRAV) external {
         address signer = tapVerifier.recoverRAVSigner(signedRAV);
