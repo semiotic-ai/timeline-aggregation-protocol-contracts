@@ -68,7 +68,7 @@ contract CollateralContractTest is Test {
         collateralContract.thawCollateral(RECEIVER_ADDRESS, COLLATERAL_AMOUNT);
 
         // Simulate passing the freeze period
-        vm.roll(block.number + FREEZE_PERIOD + 1);
+        vm.warp(block.timestamp + FREEZE_PERIOD + 1);
 
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
         collateralContract.withdrawThawedCollateral(RECEIVER_ADDRESS);
@@ -156,14 +156,14 @@ contract CollateralContractTest is Test {
             collateralContract.thawCollateral(RECEIVER_ADDRESS, partialCollateralAmount);
 
             // Simulate passing partial freeze period
-            vm.roll(block.number + partialFreezePeriod);
+            vm.warp(block.timestamp + partialFreezePeriod);
         }
 
         // expected to revert because not enough time has passed since the last thaw request
         vm.expectRevert("Collateral still thawing");
         collateralContract.withdrawThawedCollateral(RECEIVER_ADDRESS);
 
-        vm.roll(block.number + FREEZE_PERIOD);
+        vm.warp(block.timestamp + FREEZE_PERIOD);
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
         collateralContract.withdrawThawedCollateral(RECEIVER_ADDRESS);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);

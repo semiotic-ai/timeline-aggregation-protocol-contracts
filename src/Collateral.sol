@@ -15,7 +15,7 @@ import "forge-std/console.sol";
  *      which can later be redeemed using Receipt Aggregate Vouchers (`RAV`) signed
  *      by an authorized `signer`. `Senders` can deposit collateral for `receivers`,
  *      authorize `signers` to create signed `RAVs`, and withdraw collateral after a
- *      set `thawingPeriod` number of blocks. `Receivers` can redeem signed `RAVs` to
+ *      set `thawingPeriod` number of seconds. `Receivers` can redeem signed `RAVs` to
  *      claim collateral.
  * @notice This contract uses the `TAPVerifier` contract for recovering signer addresses
  *         from `RAVs`.
@@ -24,7 +24,7 @@ contract Collateral {
     struct CollateralAccount {
         uint256 balance; // Total collateral balance for a sender-receiver pair
         uint256 amountThawing; // Amount of collateral currently being thawed
-        uint256 thawEnd; // Block number at which thawing period ends
+        uint256 thawEndTimestamp; // Block number at which thawing period ends
     }
 
     // Stores how much collateral each sender has deposited for each receiver, as well as thawing information
@@ -42,7 +42,7 @@ contract Collateral {
     // The contract used for tracking used allocation IDs
     AllocationIDTracker public immutable allocationIDTracker;
 
-    // The duration in which collateral funds are thawing before they can be withdrawn
+    // The duration (in seconds) in which collateral funds are thawing before they can be withdrawn
     uint256 public immutable thawingPeriod;
 
     /**
@@ -58,7 +58,7 @@ contract Collateral {
     /**
      * @dev Emitted when a thaw request is made for collateral.
      */
-    event ThawRequest(address indexed sender, address indexed receiver, uint256 amount, uint256 thawEnd);
+    event ThawRequest(address indexed sender, address indexed receiver, uint256 amount, uint256 thawEndTimestamp);
 
     /**
      * @dev Emitted when thawed collateral is withdrawn by the sender.
@@ -104,10 +104,10 @@ contract Collateral {
 
         // Increase the amount being thawed
         account.amountThawing = totalThawingRequested;
-        // Set when the thaw is complete (thawing period number of blocks after current block)
-        account.thawEnd = block.number + thawingPeriod;
+        // Set when the thaw is complete (thawing period number of seconds after current timestamp)
+        account.thawEndTimestamp = block.timestamp + thawingPeriod;
 
-        emit ThawRequest(msg.sender, receiver, amount, account.thawEnd);
+        emit ThawRequest(msg.sender, receiver, amount, account.thawEndTimestamp);
     }
 
     /**
@@ -119,8 +119,8 @@ contract Collateral {
      */
     function withdrawThawedCollateral(address receiver) external {
         CollateralAccount storage account = collateralAccounts[msg.sender][receiver];
-        require(account.thawEnd != 0, "No collateral thawing");
-        require(account.thawEnd <= block.number, "Collateral still thawing");
+        require(account.thawEndTimestamp != 0, "No collateral thawing");
+        require(account.thawEndTimestamp <= block.timestamp, "Collateral still thawing");
 
         // Amount is the minimum between the amount being thawed and the actual balance
         uint256 amount = account.amountThawing > account.balance ? account.balance : account.amountThawing;
@@ -129,7 +129,7 @@ contract Collateral {
             account.balance -= amount; // Reduce the balance by the withdrawn amount (no underflow risk)
         }
         account.amountThawing = 0;
-        account.thawEnd = 0;
+        account.thawEndTimestamp = 0;
         emit Withdraw(msg.sender, receiver, amount);
         require(collateralToken.transfer(msg.sender, amount));
     }
