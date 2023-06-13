@@ -189,4 +189,14 @@ contract Collateral {
     function getCollateralAccount(address sender, address receiver) external view returns (CollateralAccount memory) {
         return collateralAccounts[sender][receiver];
     }
+
+    /**
+     * @dev Retrieves the collateral account details for a sender-receiver pair of the sender that a signer is authorized for.
+     * @param signer Address of the authorized signer.
+     * @param receiver Address of the receiver.
+     * @return The collateral account details.
+     */
+    function getCollateralAccountFromSignerAddress(address signer, address receiver) external view returns (CollateralAccount memory) {
+        return collateralAccounts[authorizedSigners[signer]][receiver];
+    }
 }
