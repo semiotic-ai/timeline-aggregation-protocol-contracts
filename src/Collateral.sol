@@ -53,7 +53,7 @@ contract Collateral {
     /**
      * @dev Emitted when collateral is redeemed by a receiver.
      */
-    event Redeem(address indexed receiver, uint256 amount);
+    event Redeem(address indexed sender, address indexed receiver, address indexed allocationID, uint256 amount);
 
     /**
      * @dev Emitted when a thaw request is made for collateral.
@@ -166,9 +166,9 @@ contract Collateral {
             collateralAccounts[sender][receiver].balance -= amount;
         }
 
-        emit Redeem(msg.sender, amount);
         allocationIDTracker.useAllocationID(signedRAV.rav.allocationId, allocationIDProof);
         require(collateralToken.transfer(msg.sender, amount));
+        emit Redeem(sender, msg.sender, signedRAV.rav.allocationId, amount);
     }
 
     /**
