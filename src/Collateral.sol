@@ -86,8 +86,8 @@ contract Collateral {
      */
     function depositCollateral(address receiver, uint256 amount) external {
         collateralAccounts[msg.sender][receiver].balance += amount;
-        emit Deposit(msg.sender, receiver, amount);
         require(collateralToken.transferFrom(msg.sender, address(this), amount));
+        emit Deposit(msg.sender, receiver, amount);
     }
 
     /**
@@ -130,8 +130,8 @@ contract Collateral {
         }
         account.amountThawing = 0;
         account.thawEndTimestamp = 0;
-        emit Withdraw(msg.sender, receiver, amount);
         require(collateralToken.transfer(msg.sender, amount));
+        emit Withdraw(msg.sender, receiver, amount);
     }
 
     /**
