@@ -147,13 +147,14 @@ contract Collateral {
     /**
      * @dev Redeems collateral for a receiver using a signed RAV.
      * @param signedRAV Signed RAV containing the receiver and collateral amount.
+     * @param allocationIDProof Proof of allocationID ownership.
      * @notice REVERT: this function will revert if:
      *                  - the signer is not authorized to sign for a sender.
      *                  - the sender receiver collateral account does not have enough
      *                    collateral (greater than the amount in the RAV).
      *                  - the allocation ID has already been used.
      */
-    function redeem(TAPVerifier.SignedRAV memory signedRAV) external {
+    function redeem(TAPVerifier.SignedRAV memory signedRAV, bytes calldata allocationIDProof) external {
         address signer = tapVerifier.recoverRAVSigner(signedRAV);
         require(authorizedSigners[signer] != address(0), "Signer not authorized");
 
@@ -166,7 +167,7 @@ contract Collateral {
         }
 
         emit Redeem(msg.sender, amount);
-        allocationIDTracker.useAllocationID(signedRAV.rav.allocationId);
+        allocationIDTracker.useAllocationID(signedRAV.rav.allocationId, allocationIDProof);
         require(collateralToken.transfer(msg.sender, amount));
     }
 

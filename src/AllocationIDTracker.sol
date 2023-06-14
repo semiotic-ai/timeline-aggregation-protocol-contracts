@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.13;
 
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+
 /**
  * @title AllocationIDTracker
  * @dev This contract tracks the allocation IDs of the RAVs that have been submitted to
@@ -32,20 +34,24 @@ contract AllocationIDTracker {
      * @param allocationID The allocation ID to mark as used.
      * @notice REVERT: This function may revert if the allocation ID has already been used.
      */
-    function useAllocationID(address allocationID) public {
+    function useAllocationID(address allocationID, bytes calldata proof) public {
         require(!_usedAllocationIDs[allocationID], "Allocation ID already used");
+        require(verifyProof(proof, allocationID) == true, "Proof is not valid");
         _usedAllocationIDs[allocationID] = true;
         emit AllocationIDUsed(allocationID);
     }
 
     /**
-     * @dev Marks multiple allocation IDs as used.
-     * @param allocationIDs The allocation IDs to mark as used.
-     * @notice REVERT: This function may revert if any of the allocation IDs have already been used.
+     * @dev Verifies a proof.
+     * @param proof The proof to verify.
+     * @param allocationID The allocation ID to verify.
+     * @return True if the proof is valid.
+     * @notice REVERT: This function may revert if the proof is not valid.
      */
-    function useAllocationIDs(address[] memory allocationIDs) public {
-        for (uint256 i = 0; i < allocationIDs.length; i++) {
-            useAllocationID(allocationIDs[i]);
-        }
+    function verifyProof(bytes calldata proof, address allocationID) private pure returns (bool) {
+        bytes32 messageHash = keccak256(abi.encodePacked(allocationID));
+        bytes32 digest = ECDSA.toEthSignedMessageHash(messageHash);
+        require(ECDSA.recover(digest, proof) == allocationID, "!proof");
+        return true;
     }
 }
