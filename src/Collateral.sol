@@ -154,7 +154,7 @@ contract Collateral {
      *                    collateral (greater than the amount in the RAV).
      *                  - the allocation ID has already been used.
      */
-    function redeem(TAPVerifier.SignedRAV memory signedRAV, bytes calldata allocationIDProof) external {
+    function redeem(TAPVerifier.SignedRAV calldata signedRAV, bytes calldata allocationIDProof) external {
         address signer = tapVerifier.recoverRAVSigner(signedRAV);
         require(authorizedSigners[signer] != address(0), "Signer not authorized");
 

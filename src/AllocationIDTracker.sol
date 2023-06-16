@@ -25,7 +25,7 @@ contract AllocationIDTracker {
      * @param allocationID The allocation ID to check.
      * @return True if the allocation ID has been used, false otherwise.
      */
-    function isAllocationIDUsed(address allocationID) public view returns (bool) {
+    function isAllocationIDUsed(address allocationID) external view returns (bool) {
         return _usedAllocationIDs[allocationID];
     }
 
@@ -34,7 +34,7 @@ contract AllocationIDTracker {
      * @param allocationID The allocation ID to mark as used.
      * @notice REVERT: This function may revert if the allocation ID has already been used.
      */
-    function useAllocationID(address allocationID, bytes calldata proof) public {
+    function useAllocationID(address allocationID, bytes calldata proof) external {
         require(!_usedAllocationIDs[allocationID], "Allocation ID already used");
         require(verifyProof(proof, allocationID) == true, "Proof is not valid");
         _usedAllocationIDs[allocationID] = true;
