@@ -58,7 +58,7 @@ contract Collateral {
     /**
      * @dev Emitted when a thaw request is made for collateral.
      */
-    event ThawRequest(address indexed sender, address indexed receiver, uint256 amount, uint256 thawEndTimestamp);
+    event ThawRequest(address indexed sender, address indexed receiver, uint256 amount, uint256 totalAmountThawing, uint256 thawEndTimestamp);
 
     /**
      * @dev Emitted when thawed collateral is withdrawn by the sender.
@@ -107,7 +107,7 @@ contract Collateral {
         // Set when the thaw is complete (thawing period number of seconds after current timestamp)
         account.thawEndTimestamp = block.timestamp + thawingPeriod;
 
-        emit ThawRequest(msg.sender, receiver, amount, account.thawEndTimestamp);
+        emit ThawRequest(msg.sender, receiver, amount, account.amountThawing, account.thawEndTimestamp);
     }
 
     /**
