@@ -84,7 +84,7 @@ contract Collateral {
      * @notice The collateral must be approved for transfer by the sender.
      * @notice REVERT: this function will revert if the collateral transfer fails.
      */
-    function depositCollateral(address receiver, uint256 amount) external {
+    function deposit(address receiver, uint256 amount) external {
         collateralAccounts[msg.sender][receiver].balance += amount;
         require(collateralToken.transferFrom(msg.sender, address(this), amount));
         emit Deposit(msg.sender, receiver, amount);
@@ -97,7 +97,7 @@ contract Collateral {
      * @notice REVERT: this function will revert if the sender receiver collateral account does
      *                 not have enough collateral (greater than `amount`).
      */
-    function thawCollateral(address receiver, uint256 amount) external {
+    function thaw(address receiver, uint256 amount) external {
         CollateralAccount storage account = collateralAccounts[msg.sender][receiver];
         uint256 totalThawingRequested = account.amountThawing + amount;
         require(account.balance >= totalThawingRequested, "Insufficient collateral balance");
@@ -114,10 +114,10 @@ contract Collateral {
      * @dev Withdraws all thawed collateral from a receivers collateral account.
      * @param receiver Address of the receiver.
      * @notice REVERT: this function will revert if the sender receiver collateral account does
-     *                not have any thawed collateral. This function will also revert if no thawing
-     *               period has been completed.
+     *                 not have any thawed collateral. This function will also revert if no thawing
+     *                 period has been completed.
      */
-    function withdrawThawedCollateral(address receiver) external {
+    function withdraw(address receiver) external {
         CollateralAccount storage account = collateralAccounts[msg.sender][receiver];
         require(account.thawEndTimestamp != 0, "No collateral thawing");
         require(account.thawEndTimestamp <= block.timestamp, "Collateral still thawing");

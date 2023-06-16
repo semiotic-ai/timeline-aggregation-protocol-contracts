@@ -81,13 +81,13 @@ contract CollateralContractTest is Test {
 
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(SENDER_ADDRESS);
-        collateralContract.thawCollateral(receiverAddress, COLLATERAL_AMOUNT);
+        collateralContract.thaw(receiverAddress, COLLATERAL_AMOUNT);
 
         // Simulate passing the freeze period
         vm.warp(block.timestamp + FREEZE_PERIOD + 1);
 
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
-        collateralContract.withdrawThawedCollateral(receiverAddress);
+        collateralContract.withdraw(receiverAddress);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
@@ -161,7 +161,7 @@ contract CollateralContractTest is Test {
         vm.startPrank(sender);
         // Approve the collateral contract to transfer tokens from the sender
         mockERC20.approve(address(collateralContract), amount);
-        collateralContract.depositCollateral(receiver, amount);
+        collateralContract.deposit(receiver, amount);
         vm.stopPrank();
     }
 
@@ -175,7 +175,7 @@ contract CollateralContractTest is Test {
 
         for (uint256 i = 0; i < 10; i++) {
             // Sets msg.sender address for next contract calls until stop is called
-            collateralContract.thawCollateral(receiverAddress, partialCollateralAmount);
+            collateralContract.thaw(receiverAddress, partialCollateralAmount);
 
             // Simulate passing partial freeze period
             vm.warp(block.timestamp + partialFreezePeriod);
@@ -183,11 +183,11 @@ contract CollateralContractTest is Test {
 
         // expected to revert because not enough time has passed since the last thaw request
         vm.expectRevert("Collateral still thawing");
-        collateralContract.withdrawThawedCollateral(receiverAddress);
+        collateralContract.withdraw(receiverAddress);
 
         vm.warp(block.timestamp + FREEZE_PERIOD);
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
-        collateralContract.withdrawThawedCollateral(receiverAddress);
+        collateralContract.withdraw(receiverAddress);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
