@@ -105,9 +105,11 @@ contract CollateralContractTest is Test {
         uint256 remainingCollateral = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingCollateral, COLLATERAL_AMOUNT, "Incorrect remaining collateral");
 
+        bytes memory authSignerAuthorizesSenderProof = createAuthorizedSignerProof(SENDER_ADDRESS, authorizedSignerPrivateKey);
+
         // Authorize the signer
         vm.prank(SENDER_ADDRESS);
-        collateralContract.authorizeSigner(authorizedsigner);
+        collateralContract.authorizeSigner(authorizedsigner, authSignerAuthorizesSenderProof);
 
         // Create a RAV
         uint128 RAVAggregateAmount = 158;
@@ -206,9 +208,11 @@ contract CollateralContractTest is Test {
         uint256 remainingCollateral = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingCollateral, COLLATERAL_AMOUNT, "Incorrect remaining collateral");
 
+        bytes memory authSignerAuthorizesSenderProof = createAuthorizedSignerProof(SENDER_ADDRESS, authorizedSignerPrivateKey);
+
         // Authorize the signer
         vm.prank(SENDER_ADDRESS);
-        collateralContract.authorizeSigner(authorizedsigner);
+        collateralContract.authorizeSigner(authorizedsigner, authSignerAuthorizesSenderProof);
 
         // Create a RAV
         uint128 RAVAggregateAmount = 158;
@@ -261,5 +265,13 @@ contract CollateralContractTest is Test {
             remainingCollateral,
             "Incorrect remaining amount"
         );
+    }
+
+    function createAuthorizedSignerProof(address sender, uint256 signerPrivateKey) private pure returns(bytes memory) {
+        // Create proof authorizing the sender to authorize the signer
+        bytes32 messageHash = keccak256(abi.encodePacked(sender));
+        bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, allocationIDdigest);
+        return abi.encodePacked(r, s, v);
     }
 }

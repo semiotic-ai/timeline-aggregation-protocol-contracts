@@ -138,8 +138,9 @@ contract Collateral {
      * @dev Authorizes a signer to sign RAVs for the sender.
      * @param signer Address of the authorized signer.
      */
-    function authorizeSigner(address signer) external {
+    function authorizeSigner(address signer, bytes calldata proof) external {
         require(authorizedSigners[signer] == address(0), "Signer already authorized");
+        require(verifyAuthorizedSignerProof(proof, signer), "Invalid signer proof");
         authorizedSigners[signer] = msg.sender;
         emit AuthorizeSigner(signer, msg.sender);
     }
@@ -199,5 +200,25 @@ contract Collateral {
      */
     function getCollateralAccountFromSignerAddress(address signer, address receiver) external view returns (CollateralAccount memory) {
         return collateralAccounts[authorizedSigners[signer]][receiver];
+    }
+
+    /**
+     * @dev Verifies a proof that authorizes the sender to authorize the signer.
+     * @param proof The proof provided by the signer to authorize the sender.
+     * @param signer The address of the signer being authorized.
+     * @return A boolean indicating whether the proof is valid.
+     * @notice REVERT: This function may revert if the proof is not valid.
+     */
+    function verifyAuthorizedSignerProof(bytes calldata proof, address signer) private view returns (bool) {
+        // Generate the hash of the sender's address
+        bytes32 messageHash = keccak256(abi.encodePacked(msg.sender));
+
+        // Generate the digest to be signed by the signer
+        bytes32 digest = ECDSA.toEthSignedMessageHash(messageHash);
+
+        // Verify that the recovered signer matches the expected signer
+        require(ECDSA.recover(digest, proof) == signer, "Invalid proof");
+
+        return true;
     }
 }
