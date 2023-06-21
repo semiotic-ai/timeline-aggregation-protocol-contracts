@@ -58,7 +58,13 @@ contract Collateral {
     /**
      * @dev Emitted when a thaw request is made for collateral.
      */
-    event Thaw(address indexed sender, address indexed receiver, uint256 amount, uint256 totalAmountThawing, uint256 thawEndTimestamp);
+    event Thaw(
+        address indexed sender,
+        address indexed receiver,
+        uint256 amount,
+        uint256 totalAmountThawing,
+        uint256 thawEndTimestamp
+    );
 
     /**
      * @dev Emitted when thawed collateral is withdrawn by the sender.
@@ -198,7 +204,11 @@ contract Collateral {
      * @param receiver Address of the receiver.
      * @return The collateral account details.
      */
-    function getCollateralAccountFromSignerAddress(address signer, address receiver) external view returns (CollateralAccount memory) {
+    function getCollateralAccountFromSignerAddress(address signer, address receiver)
+        external
+        view
+        returns (CollateralAccount memory)
+    {
         return collateralAccounts[authorizedSigners[signer]][receiver];
     }
 
