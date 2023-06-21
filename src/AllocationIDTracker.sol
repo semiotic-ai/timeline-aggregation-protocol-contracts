@@ -13,7 +13,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  * @notice This contract is intended to be used with the `Collateral` contract.
  */
 contract AllocationIDTracker {
-    mapping(address => bool) private _usedAllocationIDs;
+    mapping(address allocationId => bool isUsed) private _usedAllocationIDs;
 
     /**
      * @dev Emitted when an allocation ID is used.

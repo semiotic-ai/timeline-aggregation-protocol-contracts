@@ -28,10 +28,10 @@ contract Collateral {
     }
 
     // Stores how much collateral each sender has deposited for each receiver, as well as thawing information
-    mapping(address => mapping(address => CollateralAccount)) private collateralAccounts;
+    mapping(address sender => mapping(address reciever => CollateralAccount collateralAccount)) private
+        collateralAccounts;
     // Map of authorized signers to which sender they are authorized to sign for
-    // key: signer address, value: sender address
-    mapping(address => address) private authorizedSigners;
+    mapping(address signer => address sender) private authorizedSigners;
 
     // The ERC20 token used for collateral
     IERC20 public immutable collateralToken;
