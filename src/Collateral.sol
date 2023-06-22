@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.18;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {TAPVerifier} from "./TAPVerifier.sol";
 import {AllocationIDTracker} from "./AllocationIDTracker.sol";
@@ -21,6 +22,8 @@ import "forge-std/console.sol";
  *         from `RAVs`.
  */
 contract Collateral {
+    using SafeERC20 for IERC20;
+
     struct CollateralAccount {
         uint256 balance; // Total collateral balance for a sender-receiver pair
         uint256 amountThawing; // Amount of collateral currently being thawed
@@ -92,7 +95,7 @@ contract Collateral {
      */
     function deposit(address receiver, uint256 amount) external {
         collateralAccounts[msg.sender][receiver].balance += amount;
-        require(collateralToken.transferFrom(msg.sender, address(this), amount));
+        collateralToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Deposit(msg.sender, receiver, amount);
     }
 
@@ -136,7 +139,7 @@ contract Collateral {
         }
         account.amountThawing = 0;
         account.thawEndTimestamp = 0;
-        require(collateralToken.transfer(msg.sender, amount));
+        collateralToken.safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, receiver, amount);
     }
 
@@ -174,7 +177,7 @@ contract Collateral {
         }
 
         allocationIDTracker.useAllocationID(sender, signedRAV.rav.allocationId, allocationIDProof);
-        require(collateralToken.transfer(msg.sender, amount));
+        collateralToken.safeTransfer(msg.sender, amount);
         emit Redeem(sender, msg.sender, signedRAV.rav.allocationId, amount);
     }
 
