@@ -173,7 +173,7 @@ contract Collateral {
             collateralAccounts[sender][receiver].balance -= amount;
         }
 
-        allocationIDTracker.useAllocationID(signedRAV.rav.allocationId, allocationIDProof);
+        allocationIDTracker.useAllocationID(sender, signedRAV.rav.allocationId, allocationIDProof);
         require(collateralToken.transfer(msg.sender, amount));
         emit Redeem(sender, msg.sender, signedRAV.rav.allocationId, amount);
     }

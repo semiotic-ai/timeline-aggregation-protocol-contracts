@@ -237,6 +237,31 @@ contract CollateralContractTest is Test {
             remainingCollateral,
             "Incorrect remaining amount"
         );
+
+        // create additional sender address to test that the contract does not revert when redeeming same allocation ID with a different sender
+        address secondSenderAddress = address(0xa789);
+        assert(mockERC20.transfer(secondSenderAddress, 10000000));
+        depositCollateral(secondSenderAddress, receiverAddress, COLLATERAL_AMOUNT);
+
+        // should not revert when redeeming same allocationID with a different sender
+        authorizeSignerWithProof(secondSenderAddress, authorizedSignerPrivateKeys[1], authorizedsigners[1]);
+
+        // Create a RAV with same allocation ID but different signer/sender
+        TAPVerifier.SignedRAV memory second_signed_rav =
+            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
+
+        // get number of tokens in receiver's account before redeeming
+        receiverBalance = mockERC20.balanceOf(receiverAddress);
+
+        // should be able to redeem since the (sender, allocation ID) pair is unused
+        vm.prank(receiverAddress);
+        collateralContract.redeem(second_signed_rav, proof);
+
+        // get number of tokens in receiver's account after redeeming and check that it increased by the RAV amount
+        receiverBalanceAfter = mockERC20.balanceOf(receiverAddress);
+        assertEq(
+            receiverBalanceAfter, receiverBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming"
+        );
     }
 
     function authorizeSignerWithProof(address sender, uint256 signerPivateKey, address signer) private {
