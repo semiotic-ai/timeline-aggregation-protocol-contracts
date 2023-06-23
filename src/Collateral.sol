@@ -1,6 +1,6 @@
 // Copyright 2023-, Semiotic AI, Inc.
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.18;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -28,10 +28,10 @@ contract Collateral {
     }
 
     // Stores how much collateral each sender has deposited for each receiver, as well as thawing information
-    mapping(address => mapping(address => CollateralAccount)) private collateralAccounts;
+    mapping(address sender => mapping(address reciever => CollateralAccount collateralAccount)) private
+        collateralAccounts;
     // Map of authorized signers to which sender they are authorized to sign for
-    // key: signer address, value: sender address
-    mapping(address => address) private authorizedSigners;
+    mapping(address signer => address sender) private authorizedSigners;
 
     // The ERC20 token used for collateral
     IERC20 public immutable collateralToken;
@@ -58,7 +58,13 @@ contract Collateral {
     /**
      * @dev Emitted when a thaw request is made for collateral.
      */
-    event Thaw(address indexed sender, address indexed receiver, uint256 amount, uint256 totalAmountThawing, uint256 thawEndTimestamp);
+    event Thaw(
+        address indexed sender,
+        address indexed receiver,
+        uint256 amount,
+        uint256 totalAmountThawing,
+        uint256 thawEndTimestamp
+    );
 
     /**
      * @dev Emitted when thawed collateral is withdrawn by the sender.
@@ -198,7 +204,11 @@ contract Collateral {
      * @param receiver Address of the receiver.
      * @return The collateral account details.
      */
-    function getCollateralAccountFromSignerAddress(address signer, address receiver) external view returns (CollateralAccount memory) {
+    function getCollateralAccountFromSignerAddress(address signer, address receiver)
+        external
+        view
+        returns (CollateralAccount memory)
+    {
         return collateralAccounts[authorizedSigners[signer]][receiver];
     }
 

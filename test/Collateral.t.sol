@@ -1,6 +1,6 @@
 // Copyright 2023-, Semiotic AI, Inc.
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.18;
 
 import "forge-std/Test.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -39,7 +39,8 @@ contract CollateralContractTest is Test {
         // give sender tokens
         assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
 
-        collateralContract = new Collateral(address(mockERC20), address(tap_verifier), address(allocationIDTracker), FREEZE_PERIOD);
+        collateralContract =
+            new Collateral(address(mockERC20), address(tap_verifier), address(allocationIDTracker), FREEZE_PERIOD);
 
         // Set up the signer to be authorized for signing rav's
         string memory signerMnemonic =
@@ -105,7 +106,8 @@ contract CollateralContractTest is Test {
         uint256 remainingCollateral = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingCollateral, COLLATERAL_AMOUNT, "Incorrect remaining collateral");
 
-        bytes memory authSignerAuthorizesSenderProof = createAuthorizedSignerProof(SENDER_ADDRESS, authorizedSignerPrivateKey);
+        bytes memory authSignerAuthorizesSenderProof =
+            createAuthorizedSignerProof(SENDER_ADDRESS, authorizedSignerPrivateKey);
 
         // Authorize the signer
         vm.prank(SENDER_ADDRESS);
@@ -208,7 +210,8 @@ contract CollateralContractTest is Test {
         uint256 remainingCollateral = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingCollateral, COLLATERAL_AMOUNT, "Incorrect remaining collateral");
 
-        bytes memory authSignerAuthorizesSenderProof = createAuthorizedSignerProof(SENDER_ADDRESS, authorizedSignerPrivateKey);
+        bytes memory authSignerAuthorizesSenderProof =
+            createAuthorizedSignerProof(SENDER_ADDRESS, authorizedSignerPrivateKey);
 
         // Authorize the signer
         vm.prank(SENDER_ADDRESS);
@@ -247,7 +250,6 @@ contract CollateralContractTest is Test {
             receiverBalanceAfter, receiverBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming"
         );
 
-
         assertEq(
             collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress),
             remainingCollateral,
@@ -267,7 +269,11 @@ contract CollateralContractTest is Test {
         );
     }
 
-    function createAuthorizedSignerProof(address sender, uint256 signerPrivateKey) private pure returns(bytes memory) {
+    function createAuthorizedSignerProof(address sender, uint256 signerPrivateKey)
+        private
+        pure
+        returns (bytes memory)
+    {
         // Create proof authorizing the sender to authorize the signer
         bytes32 messageHash = keccak256(abi.encodePacked(sender));
         bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
