@@ -8,6 +8,7 @@ import {TAPVerifier} from "../src/TAPVerifier.sol";
 import {Collateral} from "../src/Collateral.sol";
 import {MockERC20Token} from "./MockERC20Token.sol";
 import {AllocationIDTracker} from "../src/AllocationIDTracker.sol";
+import {MockStaking} from "./MockStaking.sol";
 
 contract CollateralContractTest is Test {
     address private constant SENDER_ADDRESS = address(0x789);
@@ -15,6 +16,7 @@ contract CollateralContractTest is Test {
     uint256 private constant FREEZE_PERIOD = 800;
 
     MockERC20Token private mockERC20;
+    MockStaking private staking;
     Collateral private collateralContract;
     TAPVerifier private tap_verifier;
 
@@ -33,6 +35,9 @@ contract CollateralContractTest is Test {
         // set up mock ERC20 token
         mockERC20 = new MockERC20Token(1000000000);
 
+        // set up staking contract
+        staking = new MockStaking(address(mockERC20));
+
         // set up allocation ID tracker
         AllocationIDTracker allocationIDTracker = new AllocationIDTracker();
 
@@ -40,7 +45,10 @@ contract CollateralContractTest is Test {
         assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
 
         collateralContract =
-            new Collateral(address(mockERC20), address(tap_verifier), address(allocationIDTracker), FREEZE_PERIOD);
+        new Collateral(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), FREEZE_PERIOD);
+
+        // Approve staking contract to transfer tokens from the collateral contract
+        collateralContract.approveAll();
 
         // Set up the signer to be authorized for signing rav's
         string memory signerMnemonic =
@@ -121,11 +129,13 @@ contract CollateralContractTest is Test {
         TAPVerifier.SignedRAV memory signed_rav =
             createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
 
-        // get number of tokens in receiver's account before redeeming
-        uint256 receiverBalance = mockERC20.balanceOf(receiverAddress);
+        // get number of tokens in staking contract account before redeeming
+        uint256 stakingBalance = mockERC20.balanceOf(address(staking));
 
         // create proof of allocationID ownership
-        bytes memory proof = createAllocationIDOwnershipProof(receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey);
+        bytes memory proof = createAllocationIDOwnershipProof(
+            receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey
+        );
 
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
         vm.prank(receiverAddress);
@@ -139,11 +149,9 @@ contract CollateralContractTest is Test {
             "Incorrect remaining collateral"
         );
 
-        // get number of tokens in receiver's account after redeeming and check that it increased by the RAV amount
-        uint256 receiverBalanceAfter = mockERC20.balanceOf(receiverAddress);
-        assertEq(
-            receiverBalanceAfter, receiverBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming"
-        );
+        // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
+        uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
+        assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
     }
 
     function testGetCollateralAmount() public {
@@ -202,11 +210,13 @@ contract CollateralContractTest is Test {
         TAPVerifier.SignedRAV memory signed_rav =
             createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
 
-        // get number of tokens in receiver's account before redeeming
-        uint256 receiverBalance = mockERC20.balanceOf(receiverAddress);
+        // get number of tokens in staking contract account before redeeming
+        uint256 stakingBalance = mockERC20.balanceOf(address(staking));
 
         // create proof of allocationID ownership
-        bytes memory proof = createAllocationIDOwnershipProof(receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey);
+        bytes memory proof = createAllocationIDOwnershipProof(
+            receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey
+        );
 
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
         vm.prank(receiverAddress);
@@ -214,11 +224,9 @@ contract CollateralContractTest is Test {
 
         remainingCollateral -= RAVAggregateAmount;
 
-        // get number of tokens in receiver's account after redeeming and check that it increased by the RAV amount
-        uint256 receiverBalanceAfter = mockERC20.balanceOf(receiverAddress);
-        assertEq(
-            receiverBalanceAfter, receiverBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming"
-        );
+        // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
+        uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
+        assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
 
         assertEq(
             collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress),
@@ -251,20 +259,20 @@ contract CollateralContractTest is Test {
             createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
 
         // create proof of allocationID ownership
-        proof = createAllocationIDOwnershipProof(receiversAllocationID, secondSenderAddress, address(collateralContract), receiversAllocationIDPrivateKey);
+        proof = createAllocationIDOwnershipProof(
+            receiversAllocationID, secondSenderAddress, address(collateralContract), receiversAllocationIDPrivateKey
+        );
 
-        // get number of tokens in receiver's account before redeeming
-        receiverBalance = mockERC20.balanceOf(receiverAddress);
+        // get number of tokens in staking contract account before redeeming
+        stakingBalance = mockERC20.balanceOf(address(staking));
 
         // should be able to redeem since the (sender, allocation ID) pair is unused
         vm.prank(receiverAddress);
         collateralContract.redeem(second_signed_rav, proof);
 
-        // get number of tokens in receiver's account after redeeming and check that it increased by the RAV amount
-        receiverBalanceAfter = mockERC20.balanceOf(receiverAddress);
-        assertEq(
-            receiverBalanceAfter, receiverBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming"
-        );
+        // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
+        stakingBalanceAfter = mockERC20.balanceOf(address(staking));
+        assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
     }
 
     function authorizeSignerWithProof(address sender, uint256 signerPivateKey, address signer) private {
@@ -286,11 +294,12 @@ contract CollateralContractTest is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function createAllocationIDOwnershipProof(address allocationID, address sender, address collateralContractAddress, uint256 allocationIDPrivateKey)
-        private
-        pure
-        returns (bytes memory)
-    {
+    function createAllocationIDOwnershipProof(
+        address allocationID,
+        address sender,
+        address collateralContractAddress,
+        uint256 allocationIDPrivateKey
+    ) private pure returns (bytes memory) {
         bytes32 messageHash = keccak256(abi.encodePacked(sender, allocationID, collateralContractAddress));
         bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(allocationIDPrivateKey, allocationIDdigest);
