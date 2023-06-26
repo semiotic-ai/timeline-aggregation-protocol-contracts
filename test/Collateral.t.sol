@@ -18,8 +18,8 @@ contract CollateralContractTest is Test {
     Collateral private collateralContract;
     TAPVerifier private tap_verifier;
 
-    uint256 internal authorizedSignerPrivateKey;
-    address internal authorizedsigner;
+    uint256[] internal authorizedSignerPrivateKeys;
+    address[] internal authorizedsigners;
 
     uint256 internal receiverPrivateKey;
     uint256 internal receiversAllocationIDPrivateKey;
@@ -45,8 +45,14 @@ contract CollateralContractTest is Test {
         // Set up the signer to be authorized for signing rav's
         string memory signerMnemonic =
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-        authorizedSignerPrivateKey = vm.deriveKey(signerMnemonic, 0);
-        authorizedsigner = vm.addr(authorizedSignerPrivateKey);
+        authorizedSignerPrivateKeys.push(vm.deriveKey(signerMnemonic, 0));
+        authorizedsigners.push(vm.addr(authorizedSignerPrivateKeys[0]));
+
+        // Set up the signer to be authorized for signing rav's
+        string memory secondSignerMnemonic =
+            "thunder proof mule record purity unfair jump light limb ozone fade gift stay reduce menu";
+        authorizedSignerPrivateKeys.push(vm.deriveKey(secondSignerMnemonic, 0));
+        authorizedsigners.push(vm.addr(authorizedSignerPrivateKeys[1]));
 
         // Set up the receiver address and derive the allocation ID
         string memory receiverMnemonic =
@@ -62,7 +68,8 @@ contract CollateralContractTest is Test {
         vm.label(SENDER_ADDRESS, "SENDER_ADDRESS");
         vm.label(receiverAddress, "receiver");
         vm.label(receiversAllocationID, "receiversAllocationID");
-        vm.label(authorizedsigner, "authorizedsigner");
+        vm.label(authorizedsigners[0], "authorizedsigner_0");
+        vm.label(authorizedsigners[1], "authorizedsigner_1");
         vm.label(address(collateralContract), "collateralContract");
         vm.label(address(mockERC20), "mockERC20");
         vm.label(address(tap_verifier), "tap_verifier");
@@ -106,33 +113,19 @@ contract CollateralContractTest is Test {
         uint256 remainingCollateral = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingCollateral, COLLATERAL_AMOUNT, "Incorrect remaining collateral");
 
-        bytes memory authSignerAuthorizesSenderProof =
-            createAuthorizedSignerProof(SENDER_ADDRESS, authorizedSignerPrivateKey);
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
-        // Authorize the signer
-        vm.prank(SENDER_ADDRESS);
-        collateralContract.authorizeSigner(authorizedsigner, authSignerAuthorizesSenderProof);
-
-        // Create a RAV
+        // Create a signed rav
         uint128 RAVAggregateAmount = 158;
-        TAPVerifier.ReceiptAggregationVoucher memory rav =
-            TAPVerifier.ReceiptAggregationVoucher(receiversAllocationID, 10, RAVAggregateAmount);
-        bytes32 digest = tap_verifier.hashRAV(rav);
-
-        // Sign the digest using the authorized signer's private key
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(authorizedSignerPrivateKey, digest);
-
-        // Create a SignedRAV structure with the RAV and its signature
-        TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
+        uint64 timestampNs = 10;
+        TAPVerifier.SignedRAV memory signed_rav =
+            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
 
         // get number of tokens in receiver's account before redeeming
         uint256 receiverBalance = mockERC20.balanceOf(receiverAddress);
 
         // create proof of allocationID ownership
-        bytes32 messageHash = keccak256(abi.encodePacked(receiversAllocationID));
-        bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
-        (v, r, s) = vm.sign(receiversAllocationIDPrivateKey, allocationIDdigest);
-        bytes memory proof = abi.encodePacked(abi.encodePacked(r, s, v));
+        bytes memory proof = createAllocationIDOwnershipProof(receiversAllocationID, receiversAllocationIDPrivateKey);
 
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
         vm.prank(receiverAddress);
@@ -158,15 +151,6 @@ contract CollateralContractTest is Test {
 
         uint256 depositedAmount = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(depositedAmount, COLLATERAL_AMOUNT, "Incorrect deposited amount");
-    }
-
-    function depositCollateral(address sender, address receiver, uint256 amount) public {
-        // Sets msg.sender address for next contract calls until stop is called
-        vm.startPrank(sender);
-        // Approve the collateral contract to transfer tokens from the sender
-        mockERC20.approve(address(collateralContract), amount);
-        collateralContract.deposit(receiver, amount);
-        vm.stopPrank();
     }
 
     function testMultipleThawRequests() public {
@@ -210,33 +194,19 @@ contract CollateralContractTest is Test {
         uint256 remainingCollateral = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingCollateral, COLLATERAL_AMOUNT, "Incorrect remaining collateral");
 
-        bytes memory authSignerAuthorizesSenderProof =
-            createAuthorizedSignerProof(SENDER_ADDRESS, authorizedSignerPrivateKey);
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
-        // Authorize the signer
-        vm.prank(SENDER_ADDRESS);
-        collateralContract.authorizeSigner(authorizedsigner, authSignerAuthorizesSenderProof);
-
-        // Create a RAV
+        // Create a signed rav
         uint128 RAVAggregateAmount = 158;
-        TAPVerifier.ReceiptAggregationVoucher memory rav =
-            TAPVerifier.ReceiptAggregationVoucher(receiversAllocationID, 10, RAVAggregateAmount);
-        bytes32 digest = tap_verifier.hashRAV(rav);
-
-        // Sign the digest using the authorized signer's private key
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(authorizedSignerPrivateKey, digest);
-
-        // Create a SignedRAV structure with the RAV and its signature
-        TAPVerifier.SignedRAV memory signed_rav = TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
+        uint64 timestampNs = 10;
+        TAPVerifier.SignedRAV memory signed_rav =
+            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
 
         // get number of tokens in receiver's account before redeeming
         uint256 receiverBalance = mockERC20.balanceOf(receiverAddress);
 
         // create proof of allocationID ownership
-        bytes32 messageHash = keccak256(abi.encodePacked(receiversAllocationID));
-        bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
-        (v, r, s) = vm.sign(receiversAllocationIDPrivateKey, allocationIDdigest);
-        bytes memory proof = abi.encodePacked(abi.encodePacked(r, s, v));
+        bytes memory proof = createAllocationIDOwnershipProof(receiversAllocationID, receiversAllocationIDPrivateKey);
 
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
         vm.prank(receiverAddress);
@@ -267,6 +237,39 @@ contract CollateralContractTest is Test {
             remainingCollateral,
             "Incorrect remaining amount"
         );
+
+        // create additional sender address to test that the contract does not revert when redeeming same allocation ID with a different sender
+        address secondSenderAddress = address(0xa789);
+        assert(mockERC20.transfer(secondSenderAddress, 10000000));
+        depositCollateral(secondSenderAddress, receiverAddress, COLLATERAL_AMOUNT);
+
+        // should not revert when redeeming same allocationID with a different sender
+        authorizeSignerWithProof(secondSenderAddress, authorizedSignerPrivateKeys[1], authorizedsigners[1]);
+
+        // Create a RAV with same allocation ID but different signer/sender
+        TAPVerifier.SignedRAV memory second_signed_rav =
+            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
+
+        // get number of tokens in receiver's account before redeeming
+        receiverBalance = mockERC20.balanceOf(receiverAddress);
+
+        // should be able to redeem since the (sender, allocation ID) pair is unused
+        vm.prank(receiverAddress);
+        collateralContract.redeem(second_signed_rav, proof);
+
+        // get number of tokens in receiver's account after redeeming and check that it increased by the RAV amount
+        receiverBalanceAfter = mockERC20.balanceOf(receiverAddress);
+        assertEq(
+            receiverBalanceAfter, receiverBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming"
+        );
+    }
+
+    function authorizeSignerWithProof(address sender, uint256 signerPivateKey, address signer) private {
+        bytes memory authSignerAuthorizesSenderProof = createAuthorizedSignerProof(sender, signerPivateKey);
+
+        // Authorize the signer
+        vm.prank(sender);
+        collateralContract.authorizeSigner(signer, authSignerAuthorizesSenderProof);
     }
 
     function createAuthorizedSignerProof(address sender, uint256 signerPrivateKey)
@@ -274,10 +277,47 @@ contract CollateralContractTest is Test {
         pure
         returns (bytes memory)
     {
-        // Create proof authorizing the sender to authorize the signer
         bytes32 messageHash = keccak256(abi.encodePacked(sender));
         bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, allocationIDdigest);
         return abi.encodePacked(r, s, v);
+    }
+
+    function createAllocationIDOwnershipProof(address allocationID, uint256 allocationIDPrivateKey)
+        private
+        pure
+        returns (bytes memory)
+    {
+        bytes32 messageHash = keccak256(abi.encodePacked(allocationID));
+        bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(allocationIDPrivateKey, allocationIDdigest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    function depositCollateral(address sender, address receiver, uint256 amount) public {
+        // Sets msg.sender address for next contract calls until stop is called
+        vm.startPrank(sender);
+        // Approve the collateral contract to transfer tokens from the sender
+        mockERC20.approve(address(collateralContract), amount);
+        collateralContract.deposit(receiver, amount);
+        vm.stopPrank();
+    }
+
+    function createSignedRAV(
+        address allocationID,
+        uint64 timestampNs,
+        uint128 aggregateAmount,
+        uint256 authorizedSignerPrivateKey
+    ) private view returns (TAPVerifier.SignedRAV memory) {
+        // Create a RAV
+        TAPVerifier.ReceiptAggregationVoucher memory rav =
+            TAPVerifier.ReceiptAggregationVoucher(allocationID, timestampNs, aggregateAmount);
+        bytes32 digest = tap_verifier.hashRAV(rav);
+
+        // Sign the digest using the authorized signer's private key
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(authorizedSignerPrivateKey, digest);
+
+        // Create a SignedRAV structure with the RAV and its signature
+        return TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
     }
 }
