@@ -37,7 +37,7 @@ contract AllocationIDTracker {
      */
     function useAllocationID(address sender, address allocationID, bytes calldata proof) external {
         require(!_sendersUsedAllocationIDs[sender][allocationID], "Allocation ID already used");
-        require(verifyProof(proof, allocationID) == true, "Proof is not valid");
+        require(verifyProof(proof, sender, allocationID) == true, "Proof is not valid");
         _sendersUsedAllocationIDs[sender][allocationID] = true;
         emit AllocationIDUsed(sender, allocationID);
     }
@@ -49,8 +49,8 @@ contract AllocationIDTracker {
      * @return True if the proof is valid.
      * @notice REVERT: This function may revert if the proof is not valid.
      */
-    function verifyProof(bytes calldata proof, address allocationID) private pure returns (bool) {
-        bytes32 messageHash = keccak256(abi.encodePacked(allocationID));
+    function verifyProof(bytes calldata proof, address sender, address allocationID) private view returns (bool) {
+        bytes32 messageHash = keccak256(abi.encodePacked(sender, allocationID, msg.sender));
         bytes32 digest = ECDSA.toEthSignedMessageHash(messageHash);
         require(ECDSA.recover(digest, proof) == allocationID, "!proof");
         return true;
