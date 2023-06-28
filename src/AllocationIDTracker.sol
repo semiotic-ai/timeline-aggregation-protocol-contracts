@@ -32,7 +32,9 @@ contract AllocationIDTracker {
 
     /**
      * @dev Marks an allocation ID as used.
+     * @param sender The sender of the token to receiver.
      * @param allocationID The allocation ID to mark as used.
+     * @param proof ECDSA Proof signed by the receiver consisting of packed (sender address, allocationID, collateral contract address).
      * @notice REVERT: This function may revert if the allocation ID has already been used.
      */
     function useAllocationID(address sender, address allocationID, bytes calldata proof) external {
@@ -44,7 +46,8 @@ contract AllocationIDTracker {
 
     /**
      * @dev Verifies a proof.
-     * @param proof The proof to verify.
+     * @param proof ECDSA Proof signed by the receiver consisting of packed (sender address, allocationID, collateral contract address).
+     * @param sender The sender of the token to receiver.
      * @param allocationID The allocation ID to verify.
      * @return True if the proof is valid.
      * @notice REVERT: This function may revert if the proof is not valid.
