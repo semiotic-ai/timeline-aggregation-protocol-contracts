@@ -26,14 +26,19 @@ contract Collateral {
     struct CollateralAccount {
         uint256 balance; // Total collateral balance for a sender-receiver pair
         uint256 amountThawing; // Amount of collateral currently being thawed
-        uint256 thawEndTimestamp; // Block number at which thawing period ends
+        uint256 thawEndTimestamp; // Block number at which thawing period ends (zero if not thawing)
+    }
+
+    struct AuthorizedSigner {
+        address sender; // Sender the signer is authorized to sign for
+        uint256 thawEndTimestamp; // Block number at which thawing period ends (zero if not thawing)
     }
 
     // Stores how much collateral each sender has deposited for each receiver, as well as thawing information
     mapping(address sender => mapping(address reciever => CollateralAccount collateralAccount))
         private collateralAccounts;
-    // Map of authorized signers to which sender they are authorized to sign for
-    mapping(address signer => address sender) private authorizedSigners;
+    // Map of signer to authorized signer information
+    mapping(address signer => AuthorizedSigner authorizedSigner) private authorizedSigners;
 
     // The ERC20 token used for collateral
     IERC20 public immutable collateralToken;
@@ -48,7 +53,10 @@ contract Collateral {
     AllocationIDTracker public immutable allocationIDTracker;
 
     // The duration (in seconds) in which collateral funds are thawing before they can be withdrawn
-    uint256 public immutable thawingPeriod;
+    uint256 public immutable withdrawCollateralThawingPeriod;
+
+    // The duration (in seconds) in which a signer is thawing before they can be revoked
+    uint256 public immutable revokeSignerThawingPeriod;
 
     /**
      * @dev Emitted when collateral is deposited for a receiver.
@@ -99,13 +107,15 @@ contract Collateral {
         address staking_,
         address tapVerifier_,
         address allocationIDTracker_,
-        uint256 thawingPeriod_
+        uint256 withdrawCollateralThawingPeriod_,
+        uint256 revokeSignerThawingPeriod_
     ) {
         collateralToken = IERC20(collateralToken_);
         staking = IStaking(staking_);
         tapVerifier = TAPVerifier(tapVerifier_);
         allocationIDTracker = AllocationIDTracker(allocationIDTracker_);
-        thawingPeriod = thawingPeriod_;
+        withdrawCollateralThawingPeriod = withdrawCollateralThawingPeriod_;
+        revokeSignerThawingPeriod = revokeSignerThawingPeriod_;
     }
 
     /**
@@ -149,7 +159,7 @@ contract Collateral {
         // Increase the amount being thawed
         account.amountThawing = totalThawingRequested;
         // Set when the thaw is complete (thawing period number of seconds after current timestamp)
-        account.thawEndTimestamp = block.timestamp + thawingPeriod;
+        account.thawEndTimestamp = block.timestamp + withdrawCollateralThawingPeriod;
 
         emit Thaw(
             msg.sender,
@@ -197,15 +207,36 @@ contract Collateral {
      */
     function authorizeSigner(address signer, bytes calldata proof) external {
         require(
-            authorizedSigners[signer] == address(0),
+            authorizedSigners[signer].sender == address(0),
             "Signer already authorized"
         );
         require(
             verifyAuthorizedSignerProof(proof, signer),
             "Invalid signer proof"
         );
-        authorizedSigners[signer] = msg.sender;
+        authorizedSigners[signer].sender = msg.sender;
+        authorizedSigners[signer].thawEndTimestamp = 0;
         emit AuthorizeSigner(signer, msg.sender);
+    }
+
+    /**
+     * @dev Starts thawing a signer to be removed from the authorized signers list.
+     * @param signer Address of the signer to remove.
+     */
+    function thawSigner(address signer) external {
+        require(authorizedSigners[signer].sender == msg.sender, "Signer not authorized for sender");
+        authorizedSigners[signer].thawEndTimestamp = block.timestamp + revokeSignerThawingPeriod;
+    }
+
+    /**
+     * @dev Revokes a signer from the authorized signers list if thawed.
+     * @param signer Address of the signer to remove.
+     */
+    function revokeAuthorizedSigner(address signer) external {
+        require(authorizedSigners[signer].sender == msg.sender, "Signer not authorized for sender");
+        require(authorizedSigners[signer].thawEndTimestamp != 0, "Signer not thawing");
+        require(authorizedSigners[signer].thawEndTimestamp <= block.timestamp, "Signer still thawing");
+        delete authorizedSigners[signer];
     }
 
     /**
@@ -224,11 +255,11 @@ contract Collateral {
     ) external {
         address signer = tapVerifier.recoverRAVSigner(signedRAV);
         require(
-            authorizedSigners[signer] != address(0),
+            authorizedSigners[signer].sender != address(0),
             "Signer not authorized"
         );
 
-        address sender = authorizedSigners[signer];
+        address sender = authorizedSigners[signer].sender;
         address receiver = msg.sender;
         uint256 amount = signedRAV.rav.valueAggregate;
         address allocationId = signedRAV.rav.allocationId;
@@ -285,7 +316,7 @@ contract Collateral {
         address signer,
         address receiver
     ) external view returns (CollateralAccount memory) {
-        return collateralAccounts[authorizedSigners[signer]][receiver];
+        return collateralAccounts[authorizedSigners[signer].sender][receiver];
     }
 
     /**

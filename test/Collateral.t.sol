@@ -13,7 +13,8 @@ import {MockStaking} from "./MockStaking.sol";
 contract CollateralContractTest is Test {
     address private constant SENDER_ADDRESS = address(0x789);
     uint256 private constant COLLATERAL_AMOUNT = 1000;
-    uint256 private constant FREEZE_PERIOD = 800;
+    uint256 private constant WITHDRAW_COLLATERAL_FREEZE_PERIOD = 800;
+    uint256 private constant REVOKE_SIGNER_FREEZE_PERIOD = 800;
 
     MockERC20Token private mockERC20;
     MockStaking private staking;
@@ -45,7 +46,7 @@ contract CollateralContractTest is Test {
         assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
 
         collateralContract =
-        new Collateral(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), FREEZE_PERIOD);
+        new Collateral(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), WITHDRAW_COLLATERAL_FREEZE_PERIOD, REVOKE_SIGNER_FREEZE_PERIOD);
 
         // Approve staking contract to transfer tokens from the collateral contract
         collateralContract.approveAll();
@@ -100,7 +101,7 @@ contract CollateralContractTest is Test {
         collateralContract.thaw(receiverAddress, COLLATERAL_AMOUNT);
 
         // Simulate passing the freeze period
-        vm.warp(block.timestamp + FREEZE_PERIOD + 1);
+        vm.warp(block.timestamp + WITHDRAW_COLLATERAL_FREEZE_PERIOD + 1);
 
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
         collateralContract.withdraw(receiverAddress);
@@ -164,7 +165,7 @@ contract CollateralContractTest is Test {
     function testMultipleThawRequests() public {
         depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
         uint256 partialCollateralAmount = COLLATERAL_AMOUNT / 10;
-        uint256 partialFreezePeriod = FREEZE_PERIOD / 10;
+        uint256 partialFreezePeriod = WITHDRAW_COLLATERAL_FREEZE_PERIOD / 10;
 
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(SENDER_ADDRESS);
@@ -181,7 +182,7 @@ contract CollateralContractTest is Test {
         vm.expectRevert("Collateral still thawing");
         collateralContract.withdraw(receiverAddress);
 
-        vm.warp(block.timestamp + FREEZE_PERIOD);
+        vm.warp(block.timestamp + WITHDRAW_COLLATERAL_FREEZE_PERIOD);
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
         collateralContract.withdraw(receiverAddress);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
@@ -273,6 +274,35 @@ contract CollateralContractTest is Test {
         // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
         stakingBalanceAfter = mockERC20.balanceOf(address(staking));
         assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
+    }
+
+    function testRevokeAuthorizedSigner() public {
+        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
+
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+        vm.prank(SENDER_ADDRESS);
+        collateralContract.thawSigner(authorizedsigners[0]);
+
+        // Simulate passing the freeze period
+        vm.warp(block.timestamp + REVOKE_SIGNER_FREEZE_PERIOD + 1);
+
+        vm.prank(SENDER_ADDRESS);
+        collateralContract.revokeAuthorizedSigner(authorizedsigners[0]);
+
+        // expect revert when trying to redeem rav signed by revoked signer
+        // Create a rav signed by revoked signer
+        uint128 RAVAggregateAmount = 158;
+        uint64 timestampNs = 10;
+        TAPVerifier.SignedRAV memory signed_rav =
+            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+
+        // create proof of allocationID ownership
+        bytes memory proof = createAllocationIDOwnershipProof(
+            receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey
+        );
+        vm.expectRevert("Signer is not authorized");
+        vm.prank(receiverAddress);
+        collateralContract.redeem(signed_rav, proof);
     }
 
     function authorizeSignerWithProof(address sender, uint256 signerPivateKey, address signer) private {
