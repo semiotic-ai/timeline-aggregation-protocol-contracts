@@ -9,3 +9,9 @@ out/
 
 # Dotenv file
 .env
+
+node_modules
+
+# Lock files
+package-lock.json
+yarn.lock
