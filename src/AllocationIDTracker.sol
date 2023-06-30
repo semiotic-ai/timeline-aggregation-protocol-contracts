@@ -14,19 +14,26 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  */
 contract AllocationIDTracker {
     // senders used allocation IDs
-    mapping(address sender => mapping(address allocationId => bool isUsed)) private _sendersUsedAllocationIDs;
+    mapping(address sender => mapping(address allocationId => bool isUsed))
+        private _sendersUsedAllocationIDs;
 
     /**
      * @dev Emitted when an allocation ID is used.
      */
-    event AllocationIDUsed(address indexed sender, address indexed allocationID);
+    event AllocationIDUsed(
+        address indexed sender,
+        address indexed allocationID
+    );
 
     /**
      * @dev Checks if an allocation ID has been used.
      * @param allocationID The allocation ID to check.
      * @return True if the allocation ID has been used, false otherwise.
      */
-    function isAllocationIDUsed(address sender, address allocationID) external view returns (bool) {
+    function isAllocationIDUsed(
+        address sender,
+        address allocationID
+    ) external view returns (bool) {
         return _sendersUsedAllocationIDs[sender][allocationID];
     }
 
@@ -37,9 +44,19 @@ contract AllocationIDTracker {
      * @param proof ECDSA Proof signed by the receiver consisting of packed (sender address, allocationID, collateral contract address).
      * @notice REVERT: This function may revert if the allocation ID has already been used.
      */
-    function useAllocationID(address sender, address allocationID, bytes calldata proof) external {
-        require(!_sendersUsedAllocationIDs[sender][allocationID], "Allocation ID already used");
-        require(verifyProof(proof, sender, allocationID) == true, "Proof is not valid");
+    function useAllocationID(
+        address sender,
+        address allocationID,
+        bytes calldata proof
+    ) external {
+        require(
+            !_sendersUsedAllocationIDs[sender][allocationID],
+            "Allocation ID already used"
+        );
+        require(
+            verifyProof(proof, sender, allocationID) == true,
+            "Proof is not valid"
+        );
         _sendersUsedAllocationIDs[sender][allocationID] = true;
         emit AllocationIDUsed(sender, allocationID);
     }
@@ -52,8 +69,14 @@ contract AllocationIDTracker {
      * @return True if the proof is valid.
      * @notice REVERT: This function may revert if the proof is not valid.
      */
-    function verifyProof(bytes calldata proof, address sender, address allocationID) private view returns (bool) {
-        bytes32 messageHash = keccak256(abi.encodePacked(sender, allocationID, msg.sender));
+    function verifyProof(
+        bytes calldata proof,
+        address sender,
+        address allocationID
+    ) private view returns (bool) {
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(sender, allocationID, msg.sender)
+        );
         bytes32 digest = ECDSA.toEthSignedMessageHash(messageHash);
         require(ECDSA.recover(digest, proof) == allocationID, "!proof");
         return true;
