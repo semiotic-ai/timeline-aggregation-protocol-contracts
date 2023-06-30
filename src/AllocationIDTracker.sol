@@ -32,25 +32,28 @@ contract AllocationIDTracker {
 
     /**
      * @dev Marks an allocation ID as used.
+     * @param sender The sender of the token to receiver.
      * @param allocationID The allocation ID to mark as used.
+     * @param proof ECDSA Proof signed by the receiver consisting of packed (sender address, allocationID, collateral contract address).
      * @notice REVERT: This function may revert if the allocation ID has already been used.
      */
     function useAllocationID(address sender, address allocationID, bytes calldata proof) external {
         require(!_sendersUsedAllocationIDs[sender][allocationID], "Allocation ID already used");
-        require(verifyProof(proof, allocationID) == true, "Proof is not valid");
+        require(verifyProof(proof, sender, allocationID) == true, "Proof is not valid");
         _sendersUsedAllocationIDs[sender][allocationID] = true;
         emit AllocationIDUsed(sender, allocationID);
     }
 
     /**
      * @dev Verifies a proof.
-     * @param proof The proof to verify.
+     * @param proof ECDSA Proof signed by the receiver consisting of packed (sender address, allocationID, collateral contract address).
+     * @param sender The sender of the token to receiver.
      * @param allocationID The allocation ID to verify.
      * @return True if the proof is valid.
      * @notice REVERT: This function may revert if the proof is not valid.
      */
-    function verifyProof(bytes calldata proof, address allocationID) private pure returns (bool) {
-        bytes32 messageHash = keccak256(abi.encodePacked(allocationID));
+    function verifyProof(bytes calldata proof, address sender, address allocationID) private view returns (bool) {
+        bytes32 messageHash = keccak256(abi.encodePacked(sender, allocationID, msg.sender));
         bytes32 digest = ECDSA.toEthSignedMessageHash(messageHash);
         require(ECDSA.recover(digest, proof) == allocationID, "!proof");
         return true;

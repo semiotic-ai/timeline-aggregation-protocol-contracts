@@ -125,7 +125,7 @@ contract CollateralContractTest is Test {
         uint256 receiverBalance = mockERC20.balanceOf(receiverAddress);
 
         // create proof of allocationID ownership
-        bytes memory proof = createAllocationIDOwnershipProof(receiversAllocationID, receiversAllocationIDPrivateKey);
+        bytes memory proof = createAllocationIDOwnershipProof(receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey);
 
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
         vm.prank(receiverAddress);
@@ -206,7 +206,7 @@ contract CollateralContractTest is Test {
         uint256 receiverBalance = mockERC20.balanceOf(receiverAddress);
 
         // create proof of allocationID ownership
-        bytes memory proof = createAllocationIDOwnershipProof(receiversAllocationID, receiversAllocationIDPrivateKey);
+        bytes memory proof = createAllocationIDOwnershipProof(receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey);
 
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
         vm.prank(receiverAddress);
@@ -250,6 +250,9 @@ contract CollateralContractTest is Test {
         TAPVerifier.SignedRAV memory second_signed_rav =
             createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
 
+        // create proof of allocationID ownership
+        proof = createAllocationIDOwnershipProof(receiversAllocationID, secondSenderAddress, address(collateralContract), receiversAllocationIDPrivateKey);
+
         // get number of tokens in receiver's account before redeeming
         receiverBalance = mockERC20.balanceOf(receiverAddress);
 
@@ -283,12 +286,12 @@ contract CollateralContractTest is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function createAllocationIDOwnershipProof(address allocationID, uint256 allocationIDPrivateKey)
+    function createAllocationIDOwnershipProof(address allocationID, address sender, address collateralContractAddress, uint256 allocationIDPrivateKey)
         private
         pure
         returns (bytes memory)
     {
-        bytes32 messageHash = keccak256(abi.encodePacked(allocationID));
+        bytes32 messageHash = keccak256(abi.encodePacked(sender, allocationID, collateralContractAddress));
         bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(allocationIDPrivateKey, allocationIDdigest);
         return abi.encodePacked(r, s, v);
