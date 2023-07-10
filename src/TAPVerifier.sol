@@ -24,7 +24,9 @@ contract TAPVerifier is EIP712 {
 
     // --- EIP 712 ---
     bytes32 private constant RAV_TYPEHASH =
-        keccak256("ReceiptAggregateVoucher(address allocationId,uint64 timestampNs,uint128 valueAggregate)");
+        keccak256(
+            "ReceiptAggregateVoucher(address allocationId,uint64 timestampNs,uint128 valueAggregate)"
+        );
 
     /**
      * @dev Constructs a new instance of the TAPVerifier contract.
@@ -37,7 +39,9 @@ contract TAPVerifier is EIP712 {
      * @return The address of the signer.
      * @notice REVERT: This function may revert if ECDSA.recover fails, check ECDSA library for details.
      */
-    function recoverRAVSigner(SignedRAV calldata signedRAV) public view returns (address) {
+    function recoverRAVSigner(
+        SignedRAV calldata signedRAV
+    ) public view returns (address) {
         bytes32 messageHash = hashRAV(signedRAV.rav);
         return ECDSA.recover(messageHash, signedRAV.signature);
     }
@@ -49,7 +53,10 @@ contract TAPVerifier is EIP712 {
      * @return True if the recovered address matches the provided address, false otherwise.
      * @notice REVERT: This function may revert if ECDSA.recover fails, check ECDSA library for details.
      */
-    function verifyRAVSignature(SignedRAV calldata signedRAV, address expectedAddress) external view returns (bool) {
+    function verifyRAVSignature(
+        SignedRAV calldata signedRAV,
+        address expectedAddress
+    ) external view returns (bool) {
         return recoverRAVSigner(signedRAV) == expectedAddress;
     }
 
@@ -58,8 +65,19 @@ contract TAPVerifier is EIP712 {
      * @param rav The RAV for which to compute the hash.
      * @return The hash of the RAV.
      */
-    function hashRAV(ReceiptAggregationVoucher calldata rav) public view returns (bytes32) {
+    function hashRAV(
+        ReceiptAggregationVoucher calldata rav
+    ) public view returns (bytes32) {
         return
-            _hashTypedDataV4(keccak256(abi.encode(RAV_TYPEHASH, rav.allocationId, rav.timestampNs, rav.valueAggregate)));
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        RAV_TYPEHASH,
+                        rav.allocationId,
+                        rav.timestampNs,
+                        rav.valueAggregate
+                    )
+                )
+            );
     }
 }

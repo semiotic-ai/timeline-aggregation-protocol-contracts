@@ -30,8 +30,8 @@ contract Collateral {
     }
 
     // Stores how much collateral each sender has deposited for each receiver, as well as thawing information
-    mapping(address sender => mapping(address reciever => CollateralAccount collateralAccount)) private
-        collateralAccounts;
+    mapping(address sender => mapping(address reciever => CollateralAccount collateralAccount))
+        private collateralAccounts;
     // Map of authorized signers to which sender they are authorized to sign for
     mapping(address signer => address sender) private authorizedSigners;
 
@@ -53,12 +53,21 @@ contract Collateral {
     /**
      * @dev Emitted when collateral is deposited for a receiver.
      */
-    event Deposit(address indexed sender, address indexed receiver, uint256 amount);
+    event Deposit(
+        address indexed sender,
+        address indexed receiver,
+        uint256 amount
+    );
 
     /**
      * @dev Emitted when collateral is redeemed by a receiver.
      */
-    event Redeem(address indexed sender, address indexed receiver, address indexed allocationID, uint256 amount);
+    event Redeem(
+        address indexed sender,
+        address indexed receiver,
+        address indexed allocationID,
+        uint256 amount
+    );
 
     /**
      * @dev Emitted when a thaw request is made for collateral.
@@ -74,7 +83,11 @@ contract Collateral {
     /**
      * @dev Emitted when thawed collateral is withdrawn by the sender.
      */
-    event Withdraw(address indexed sender, address indexed receiver, uint256 amount);
+    event Withdraw(
+        address indexed sender,
+        address indexed receiver,
+        uint256 amount
+    );
 
     /**
      * @dev Emitted when a signer is authorized to sign RAVs for a sender.
@@ -124,16 +137,27 @@ contract Collateral {
      *                 not have enough collateral (greater than `amount`).
      */
     function thaw(address receiver, uint256 amount) external {
-        CollateralAccount storage account = collateralAccounts[msg.sender][receiver];
+        CollateralAccount storage account = collateralAccounts[msg.sender][
+            receiver
+        ];
         uint256 totalThawingRequested = account.amountThawing + amount;
-        require(account.balance >= totalThawingRequested, "Insufficient collateral balance");
+        require(
+            account.balance >= totalThawingRequested,
+            "Insufficient collateral balance"
+        );
 
         // Increase the amount being thawed
         account.amountThawing = totalThawingRequested;
         // Set when the thaw is complete (thawing period number of seconds after current timestamp)
         account.thawEndTimestamp = block.timestamp + thawingPeriod;
 
-        emit Thaw(msg.sender, receiver, amount, account.amountThawing, account.thawEndTimestamp);
+        emit Thaw(
+            msg.sender,
+            receiver,
+            amount,
+            account.amountThawing,
+            account.thawEndTimestamp
+        );
     }
 
     /**
@@ -144,12 +168,19 @@ contract Collateral {
      *                 period has been completed.
      */
     function withdraw(address receiver) external {
-        CollateralAccount storage account = collateralAccounts[msg.sender][receiver];
+        CollateralAccount storage account = collateralAccounts[msg.sender][
+            receiver
+        ];
         require(account.thawEndTimestamp != 0, "No collateral thawing");
-        require(account.thawEndTimestamp <= block.timestamp, "Collateral still thawing");
+        require(
+            account.thawEndTimestamp <= block.timestamp,
+            "Collateral still thawing"
+        );
 
         // Amount is the minimum between the amount being thawed and the actual balance
-        uint256 amount = account.amountThawing > account.balance ? account.balance : account.amountThawing;
+        uint256 amount = account.amountThawing > account.balance
+            ? account.balance
+            : account.amountThawing;
 
         unchecked {
             account.balance -= amount; // Reduce the balance by the withdrawn amount (no underflow risk)
@@ -165,8 +196,14 @@ contract Collateral {
      * @param signer Address of the authorized signer.
      */
     function authorizeSigner(address signer, bytes calldata proof) external {
-        require(authorizedSigners[signer] == address(0), "Signer already authorized");
-        require(verifyAuthorizedSignerProof(proof, signer), "Invalid signer proof");
+        require(
+            authorizedSigners[signer] == address(0),
+            "Signer already authorized"
+        );
+        require(
+            verifyAuthorizedSignerProof(proof, signer),
+            "Invalid signer proof"
+        );
         authorizedSigners[signer] = msg.sender;
         emit AuthorizeSigner(signer, msg.sender);
     }
@@ -181,20 +218,33 @@ contract Collateral {
      *                    collateral (greater than the amount in the RAV).
      *                  - the allocation ID has already been used.
      */
-    function redeem(TAPVerifier.SignedRAV calldata signedRAV, bytes calldata allocationIDProof) external {
+    function redeem(
+        TAPVerifier.SignedRAV calldata signedRAV,
+        bytes calldata allocationIDProof
+    ) external {
         address signer = tapVerifier.recoverRAVSigner(signedRAV);
-        require(authorizedSigners[signer] != address(0), "Signer not authorized");
+        require(
+            authorizedSigners[signer] != address(0),
+            "Signer not authorized"
+        );
 
         address sender = authorizedSigners[signer];
         address receiver = msg.sender;
         uint256 amount = signedRAV.rav.valueAggregate;
         address allocationId = signedRAV.rav.allocationId;
-        require(collateralAccounts[sender][receiver].balance >= amount, "Insufficient collateral balance");
+        require(
+            collateralAccounts[sender][receiver].balance >= amount,
+            "Insufficient collateral balance"
+        );
         unchecked {
             collateralAccounts[sender][receiver].balance -= amount;
         }
 
-        allocationIDTracker.useAllocationID(sender, allocationId, allocationIDProof);
+        allocationIDTracker.useAllocationID(
+            sender,
+            allocationId,
+            allocationIDProof
+        );
         staking.collect(amount, allocationId);
         emit Redeem(sender, msg.sender, signedRAV.rav.allocationId, amount);
     }
@@ -205,7 +255,10 @@ contract Collateral {
      * @param receiver Address of the receiver.
      * @return The amount of collateral deposited.
      */
-    function getCollateralAmount(address sender, address receiver) external view returns (uint256) {
+    function getCollateralAmount(
+        address sender,
+        address receiver
+    ) external view returns (uint256) {
         return collateralAccounts[sender][receiver].balance;
     }
 
@@ -215,7 +268,10 @@ contract Collateral {
      * @param receiver Address of the receiver.
      * @return The collateral account details.
      */
-    function getCollateralAccount(address sender, address receiver) external view returns (CollateralAccount memory) {
+    function getCollateralAccount(
+        address sender,
+        address receiver
+    ) external view returns (CollateralAccount memory) {
         return collateralAccounts[sender][receiver];
     }
 
@@ -225,11 +281,10 @@ contract Collateral {
      * @param receiver Address of the receiver.
      * @return The collateral account details.
      */
-    function getCollateralAccountFromSignerAddress(address signer, address receiver)
-        external
-        view
-        returns (CollateralAccount memory)
-    {
+    function getCollateralAccountFromSignerAddress(
+        address signer,
+        address receiver
+    ) external view returns (CollateralAccount memory) {
         return collateralAccounts[authorizedSigners[signer]][receiver];
     }
 
@@ -240,7 +295,10 @@ contract Collateral {
      * @return A boolean indicating whether the proof is valid.
      * @notice REVERT: This function may revert if the proof is not valid.
      */
-    function verifyAuthorizedSignerProof(bytes calldata proof, address signer) private view returns (bool) {
+    function verifyAuthorizedSignerProof(
+        bytes calldata proof,
+        address signer
+    ) private view returns (bool) {
         // Generate the hash of the sender's address
         bytes32 messageHash = keccak256(abi.encodePacked(msg.sender));
 
