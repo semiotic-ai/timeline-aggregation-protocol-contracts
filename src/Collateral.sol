@@ -7,8 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {TAPVerifier} from "./TAPVerifier.sol";
 import {AllocationIDTracker} from "./AllocationIDTracker.sol";
-
-import "forge-std/console.sol";
+import {IStaking} from "./IStaking.sol";
 
 /**
  * @title Collateral
@@ -38,6 +37,9 @@ contract Collateral {
 
     // The ERC20 token used for collateral
     IERC20 public immutable collateralToken;
+
+    // Graph staking contract
+    IStaking public immutable staking;
 
     // The contract used for verifying receipt aggregate vouchers
     TAPVerifier public immutable tapVerifier;
@@ -79,11 +81,26 @@ contract Collateral {
      */
     event AuthorizeSigner(address indexed signer, address indexed sender);
 
-    constructor(address collateralToken_, address tapVerifier_, address allocationIDTracker_, uint256 thawingPeriod_) {
+    constructor(
+        address collateralToken_,
+        address staking_,
+        address tapVerifier_,
+        address allocationIDTracker_,
+        uint256 thawingPeriod_
+    ) {
         collateralToken = IERC20(collateralToken_);
+        staking = IStaking(staking_);
         tapVerifier = TAPVerifier(tapVerifier_);
         allocationIDTracker = AllocationIDTracker(allocationIDTracker_);
         thawingPeriod = thawingPeriod_;
+    }
+
+    /**
+     * @notice Approve the staking contract to pull any amount of tokens from this contract.
+     * @dev Increased gas efficiency instead of approving on each voucher redeem
+     */
+    function approveAll() external {
+        collateralToken.approve(address(staking), type(uint256).max);
     }
 
     /**
@@ -171,13 +188,14 @@ contract Collateral {
         address sender = authorizedSigners[signer];
         address receiver = msg.sender;
         uint256 amount = signedRAV.rav.valueAggregate;
+        address allocationId = signedRAV.rav.allocationId;
         require(collateralAccounts[sender][receiver].balance >= amount, "Insufficient collateral balance");
         unchecked {
             collateralAccounts[sender][receiver].balance -= amount;
         }
 
-        allocationIDTracker.useAllocationID(sender, signedRAV.rav.allocationId, allocationIDProof);
-        collateralToken.safeTransfer(msg.sender, amount);
+        allocationIDTracker.useAllocationID(sender, allocationId, allocationIDProof);
+        staking.collect(amount, allocationId);
         emit Redeem(sender, msg.sender, signedRAV.rav.allocationId, amount);
     }
 
