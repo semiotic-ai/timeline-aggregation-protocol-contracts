@@ -25,9 +25,9 @@ contract CollateralContractTest is Test {
     address[] internal authorizedsigners;
 
     uint256 internal receiverPrivateKey;
-    uint256 internal receiversAllocationIDPrivateKey;
+    uint256[] internal receiversAllocationIDPrivateKeys;
     address internal receiverAddress;
-    address internal receiversAllocationID;
+    address[] internal receiversAllocationIDs;
 
     function setUp() public {
         // Create an instance of the TAPVerifier contract
@@ -69,14 +69,17 @@ contract CollateralContractTest is Test {
         receiverPrivateKey = vm.deriveKey(receiverMnemonic, 0);
         receiverAddress = vm.addr(receiverPrivateKey);
 
-        // Derive the allocation ID from the receiver Mneumonic
-        receiversAllocationIDPrivateKey = vm.deriveKey(receiverMnemonic, 1);
-        receiversAllocationID = vm.addr(receiversAllocationIDPrivateKey);
+        // Derive the allocation IDs from the receiver Mneumonic
+        receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiverMnemonic, 1));
+        receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[0]));
+
+        receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiverMnemonic, 2));
+        receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[1]));
 
         // label all known addresses for debugging
         vm.label(SENDER_ADDRESS, "SENDER_ADDRESS");
         vm.label(receiverAddress, "receiver");
-        vm.label(receiversAllocationID, "receiversAllocationID");
+        vm.label(receiversAllocationIDs[0], "receiversAllocationID");
         vm.label(authorizedsigners[0], "authorizedsigner_0");
         vm.label(authorizedsigners[1], "authorizedsigner_1");
         vm.label(address(collateralContract), "collateralContract");
@@ -128,15 +131,15 @@ contract CollateralContractTest is Test {
         uint128 RAVAggregateAmount = 158;
         uint64 timestampNs = 10;
         TAPVerifier.SignedRAV memory signed_rav =
-            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
 
         // get number of tokens in staking contract account before redeeming
         uint256 stakingBalance = mockERC20.balanceOf(address(staking));
 
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
         redeemSignedRAV(
-            receiversAllocationID,
-            receiversAllocationIDPrivateKey,
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
             receiverAddress,
             SENDER_ADDRESS,
             address(collateralContract),
@@ -210,15 +213,15 @@ contract CollateralContractTest is Test {
         uint128 RAVAggregateAmount = 158;
         uint64 timestampNs = 10;
         TAPVerifier.SignedRAV memory signed_rav =
-            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
 
         // get number of tokens in staking contract account before redeeming
         uint256 stakingBalance = mockERC20.balanceOf(address(staking));
 
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
         redeemSignedRAV(
-            receiversAllocationID,
-            receiversAllocationIDPrivateKey,
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
             receiverAddress,
             SENDER_ADDRESS,
             address(collateralContract),
@@ -240,8 +243,8 @@ contract CollateralContractTest is Test {
         // expect revert when trying to redeem with the same allocation ID
         vm.expectRevert("Allocation ID already used");
         redeemSignedRAV(
-            receiversAllocationID,
-            receiversAllocationIDPrivateKey,
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
             receiverAddress,
             SENDER_ADDRESS,
             address(collateralContract),
@@ -265,15 +268,15 @@ contract CollateralContractTest is Test {
 
         // Create a RAV with same allocation ID but different signer/sender
         TAPVerifier.SignedRAV memory second_signed_rav =
-            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
 
         // get number of tokens in staking contract account before redeeming
         stakingBalance = mockERC20.balanceOf(address(staking));
 
         // should be able to redeem since the (sender, allocation ID) pair is unused
         redeemSignedRAV(
-            receiversAllocationID,
-            receiversAllocationIDPrivateKey,
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
             receiverAddress,
             secondSenderAddress,
             address(collateralContract),
