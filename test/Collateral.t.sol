@@ -298,23 +298,39 @@ contract CollateralContractTest is Test {
         // Simulate passing the freeze period
         vm.warp(block.timestamp + REVOKE_SIGNER_FREEZE_PERIOD + 1);
 
+        // Create a rav signed by signer that is thawed for revocation
+        uint128 RAVAggregateAmount = 158;
+        uint64 timestampNs = 10;
+        TAPVerifier.SignedRAV memory signed_rav =
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+
+        // RAV's signed by authorized signer should still be valid until signer is revoked
+        redeemSignedRAV(
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
+        );
+
         vm.prank(SENDER_ADDRESS);
         collateralContract.revokeAuthorizedSigner(authorizedsigners[0]);
 
         // expect revert when trying to redeem rav signed by revoked signer
         // Create a rav signed by revoked signer
-        uint128 RAVAggregateAmount = 158;
-        uint64 timestampNs = 10;
-        TAPVerifier.SignedRAV memory signed_rav =
-            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+        signed_rav =
+            createSignedRAV(receiversAllocationIDs[1], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
 
-        // create proof of allocationID ownership
-        bytes memory proof = createAllocationIDOwnershipProof(
-            receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey
+        vm.expectRevert("Signer not authorized");
+        redeemSignedRAV(
+            receiversAllocationIDs[1],
+            receiversAllocationIDPrivateKeys[1],
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
         );
-        vm.expectRevert("Signer is not authorized");
-        vm.prank(receiverAddress);
-        collateralContract.redeem(signed_rav, proof);
     }
 
     function authorizeSignerWithProof(address sender, uint256 signerPivateKey, address signer) private {
