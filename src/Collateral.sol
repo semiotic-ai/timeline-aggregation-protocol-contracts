@@ -29,7 +29,7 @@ contract Collateral {
         uint256 thawEndTimestamp; // Block number at which thawing period ends (zero if not thawing)
     }
 
-    struct AuthorizedSigner {
+    struct SenderAuthorization {
         address sender; // Sender the signer is authorized to sign for
         uint256 thawEndTimestamp; // Block number at which thawing period ends (zero if not thawing)
     }
@@ -38,7 +38,7 @@ contract Collateral {
     mapping(address sender => mapping(address reciever => CollateralAccount collateralAccount))
         private collateralAccounts;
     // Map of signer to authorized signer information
-    mapping(address signer => AuthorizedSigner authorizedSigner)
+    mapping(address signer => SenderAuthorization authorizedSigner)
         private authorizedSigners;
 
     // The ERC20 token used for collateral
