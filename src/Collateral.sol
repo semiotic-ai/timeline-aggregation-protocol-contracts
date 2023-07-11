@@ -38,7 +38,8 @@ contract Collateral {
     mapping(address sender => mapping(address reciever => CollateralAccount collateralAccount))
         private collateralAccounts;
     // Map of signer to authorized signer information
-    mapping(address signer => AuthorizedSigner authorizedSigner) private authorizedSigners;
+    mapping(address signer => AuthorizedSigner authorizedSigner)
+        private authorizedSigners;
 
     // The ERC20 token used for collateral
     IERC20 public immutable collateralToken;
@@ -176,7 +177,9 @@ contract Collateral {
         // Increase the amount being thawed
         account.amountThawing = totalThawingRequested;
         // Set when the thaw is complete (thawing period number of seconds after current timestamp)
-        account.thawEndTimestamp = block.timestamp + withdrawCollateralThawingPeriod;
+        account.thawEndTimestamp =
+            block.timestamp +
+            withdrawCollateralThawingPeriod;
 
         emit Thaw(
             msg.sender,
@@ -241,8 +244,13 @@ contract Collateral {
      * @param signer Address of the signer to remove.
      */
     function thawSigner(address signer) external {
-        require(authorizedSigners[signer].sender == msg.sender, "Signer not authorized for sender");
-        authorizedSigners[signer].thawEndTimestamp = block.timestamp + revokeSignerThawingPeriod;
+        require(
+            authorizedSigners[signer].sender == msg.sender,
+            "Signer not authorized for sender"
+        );
+        authorizedSigners[signer].thawEndTimestamp =
+            block.timestamp +
+            revokeSignerThawingPeriod;
         emit ThawSigner(
             authorizedSigners[signer].sender,
             signer,
@@ -255,14 +263,20 @@ contract Collateral {
      * @param signer Address of the signer to remove.
      */
     function revokeAuthorizedSigner(address signer) external {
-        require(authorizedSigners[signer].sender == msg.sender, "Signer not authorized for sender");
-        require(authorizedSigners[signer].thawEndTimestamp != 0, "Signer not thawing");
-        require(authorizedSigners[signer].thawEndTimestamp <= block.timestamp, "Signer still thawing");
-        delete authorizedSigners[signer];
-        emit RevokeAuthorizedSigner(
-            authorizedSigners[signer].sender,
-            signer
+        require(
+            authorizedSigners[signer].sender == msg.sender,
+            "Signer not authorized for sender"
         );
+        require(
+            authorizedSigners[signer].thawEndTimestamp != 0,
+            "Signer not thawing"
+        );
+        require(
+            authorizedSigners[signer].thawEndTimestamp <= block.timestamp,
+            "Signer still thawing"
+        );
+        delete authorizedSigners[signer];
+        emit RevokeAuthorizedSigner(authorizedSigners[signer].sender, signer);
     }
 
     /**
