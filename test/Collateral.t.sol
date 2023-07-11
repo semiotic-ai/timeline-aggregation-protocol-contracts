@@ -133,14 +133,15 @@ contract CollateralContractTest is Test {
         // get number of tokens in staking contract account before redeeming
         uint256 stakingBalance = mockERC20.balanceOf(address(staking));
 
-        // create proof of allocationID ownership
-        bytes memory proof = createAllocationIDOwnershipProof(
-            receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey
-        );
-
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
-        vm.prank(receiverAddress);
-        collateralContract.redeem(signed_rav, proof);
+        redeemSignedRAV(
+            receiversAllocationID,
+            receiversAllocationIDPrivateKey,
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
+        );
 
         remainingCollateral -= RAVAggregateAmount;
 
@@ -214,14 +215,15 @@ contract CollateralContractTest is Test {
         // get number of tokens in staking contract account before redeeming
         uint256 stakingBalance = mockERC20.balanceOf(address(staking));
 
-        // create proof of allocationID ownership
-        bytes memory proof = createAllocationIDOwnershipProof(
-            receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey
-        );
-
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
-        vm.prank(receiverAddress);
-        collateralContract.redeem(signed_rav, proof);
+        redeemSignedRAV(
+            receiversAllocationID,
+            receiversAllocationIDPrivateKey,
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
+        );
 
         remainingCollateral -= RAVAggregateAmount;
 
@@ -237,8 +239,14 @@ contract CollateralContractTest is Test {
 
         // expect revert when trying to redeem with the same allocation ID
         vm.expectRevert("Allocation ID already used");
-        vm.prank(receiverAddress);
-        collateralContract.redeem(signed_rav, proof);
+        redeemSignedRAV(
+            receiversAllocationID,
+            receiversAllocationIDPrivateKey,
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
+        );
 
         // remaining collateral should not have changed
         assertEq(
@@ -259,17 +267,18 @@ contract CollateralContractTest is Test {
         TAPVerifier.SignedRAV memory second_signed_rav =
             createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
 
-        // create proof of allocationID ownership
-        proof = createAllocationIDOwnershipProof(
-            receiversAllocationID, secondSenderAddress, address(collateralContract), receiversAllocationIDPrivateKey
-        );
-
         // get number of tokens in staking contract account before redeeming
         stakingBalance = mockERC20.balanceOf(address(staking));
 
         // should be able to redeem since the (sender, allocation ID) pair is unused
-        vm.prank(receiverAddress);
-        collateralContract.redeem(second_signed_rav, proof);
+        redeemSignedRAV(
+            receiversAllocationID,
+            receiversAllocationIDPrivateKey,
+            receiverAddress,
+            secondSenderAddress,
+            address(collateralContract),
+            second_signed_rav
+        );
 
         // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
         stakingBalanceAfter = mockERC20.balanceOf(address(staking));
@@ -361,5 +370,21 @@ contract CollateralContractTest is Test {
 
         // Create a SignedRAV structure with the RAV and its signature
         return TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
+    }
+
+    function redeemSignedRAV(
+        address allocationID,
+        uint256 allocationIDPrivateKey,
+        address receiverAddress_,
+        address senderAddress,
+        address collateralContractAddress,
+        TAPVerifier.SignedRAV memory signedRAV
+    ) private {
+        // create proof of allocationID ownership
+        bytes memory proof = createAllocationIDOwnershipProof(
+            allocationID, senderAddress, address(collateralContractAddress), allocationIDPrivateKey
+        );
+        vm.prank(receiverAddress_);
+        collateralContract.redeem(signedRAV, proof);
     }
 }
