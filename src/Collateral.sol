@@ -89,6 +89,23 @@ contract Collateral {
     );
 
     /**
+     * @dev Emitted when a thaw request is made for authorized signer
+     */
+    event ThawSigner(
+        address indexed sender,
+        address indexed authorizedSigner,
+        uint256 thawEndTimestamp
+    );
+
+    /**
+     * @dev Emitted when a authorized signer has been revoked
+     */
+    event RevokeAuthorizedSigner(
+        address indexed sender,
+        address indexed authorizedSigner
+    );
+
+    /**
      * @dev Emitted when thawed collateral is withdrawn by the sender.
      */
     event Withdraw(
@@ -226,6 +243,11 @@ contract Collateral {
     function thawSigner(address signer) external {
         require(authorizedSigners[signer].sender == msg.sender, "Signer not authorized for sender");
         authorizedSigners[signer].thawEndTimestamp = block.timestamp + revokeSignerThawingPeriod;
+        emit ThawSigner(
+            authorizedSigners[signer].sender,
+            signer,
+            authorizedSigners[signer].thawEndTimestamp
+        );
     }
 
     /**
@@ -237,6 +259,10 @@ contract Collateral {
         require(authorizedSigners[signer].thawEndTimestamp != 0, "Signer not thawing");
         require(authorizedSigners[signer].thawEndTimestamp <= block.timestamp, "Signer still thawing");
         delete authorizedSigners[signer];
+        emit RevokeAuthorizedSigner(
+            authorizedSigners[signer].sender,
+            signer
+        );
     }
 
     /**
