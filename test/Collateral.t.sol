@@ -13,7 +13,8 @@ import {MockStaking} from "./MockStaking.sol";
 contract CollateralContractTest is Test {
     address private constant SENDER_ADDRESS = address(0x789);
     uint256 private constant COLLATERAL_AMOUNT = 1000;
-    uint256 private constant FREEZE_PERIOD = 800;
+    uint256 private constant WITHDRAW_COLLATERAL_FREEZE_PERIOD = 800;
+    uint256 private constant REVOKE_SIGNER_FREEZE_PERIOD = 800;
 
     MockERC20Token private mockERC20;
     MockStaking private staking;
@@ -24,9 +25,9 @@ contract CollateralContractTest is Test {
     address[] internal authorizedsigners;
 
     uint256 internal receiverPrivateKey;
-    uint256 internal receiversAllocationIDPrivateKey;
+    uint256[] internal receiversAllocationIDPrivateKeys;
     address internal receiverAddress;
-    address internal receiversAllocationID;
+    address[] internal receiversAllocationIDs;
 
     function setUp() public {
         // Create an instance of the TAPVerifier contract
@@ -45,7 +46,7 @@ contract CollateralContractTest is Test {
         assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
 
         collateralContract =
-        new Collateral(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), FREEZE_PERIOD);
+        new Collateral(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), WITHDRAW_COLLATERAL_FREEZE_PERIOD, REVOKE_SIGNER_FREEZE_PERIOD);
 
         // Approve staking contract to transfer tokens from the collateral contract
         collateralContract.approveAll();
@@ -68,14 +69,17 @@ contract CollateralContractTest is Test {
         receiverPrivateKey = vm.deriveKey(receiverMnemonic, 0);
         receiverAddress = vm.addr(receiverPrivateKey);
 
-        // Derive the allocation ID from the receiver Mneumonic
-        receiversAllocationIDPrivateKey = vm.deriveKey(receiverMnemonic, 1);
-        receiversAllocationID = vm.addr(receiversAllocationIDPrivateKey);
+        // Derive the allocation IDs from the receiver Mneumonic
+        receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiverMnemonic, 1));
+        receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[0]));
+
+        receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiverMnemonic, 2));
+        receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[1]));
 
         // label all known addresses for debugging
         vm.label(SENDER_ADDRESS, "SENDER_ADDRESS");
         vm.label(receiverAddress, "receiver");
-        vm.label(receiversAllocationID, "receiversAllocationID");
+        vm.label(receiversAllocationIDs[0], "receiversAllocationID");
         vm.label(authorizedsigners[0], "authorizedsigner_0");
         vm.label(authorizedsigners[1], "authorizedsigner_1");
         vm.label(address(collateralContract), "collateralContract");
@@ -100,7 +104,7 @@ contract CollateralContractTest is Test {
         collateralContract.thaw(receiverAddress, COLLATERAL_AMOUNT);
 
         // Simulate passing the freeze period
-        vm.warp(block.timestamp + FREEZE_PERIOD + 1);
+        vm.warp(block.timestamp + WITHDRAW_COLLATERAL_FREEZE_PERIOD + 1);
 
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
         collateralContract.withdraw(receiverAddress);
@@ -127,19 +131,20 @@ contract CollateralContractTest is Test {
         uint128 RAVAggregateAmount = 158;
         uint64 timestampNs = 10;
         TAPVerifier.SignedRAV memory signed_rav =
-            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
 
         // get number of tokens in staking contract account before redeeming
         uint256 stakingBalance = mockERC20.balanceOf(address(staking));
 
-        // create proof of allocationID ownership
-        bytes memory proof = createAllocationIDOwnershipProof(
-            receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey
-        );
-
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
-        vm.prank(receiverAddress);
-        collateralContract.redeem(signed_rav, proof);
+        redeemSignedRAV(
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
+        );
 
         remainingCollateral -= RAVAggregateAmount;
 
@@ -164,7 +169,7 @@ contract CollateralContractTest is Test {
     function testMultipleThawRequests() public {
         depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
         uint256 partialCollateralAmount = COLLATERAL_AMOUNT / 10;
-        uint256 partialFreezePeriod = FREEZE_PERIOD / 10;
+        uint256 partialFreezePeriod = WITHDRAW_COLLATERAL_FREEZE_PERIOD / 10;
 
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(SENDER_ADDRESS);
@@ -181,7 +186,7 @@ contract CollateralContractTest is Test {
         vm.expectRevert("Collateral still thawing");
         collateralContract.withdraw(receiverAddress);
 
-        vm.warp(block.timestamp + FREEZE_PERIOD);
+        vm.warp(block.timestamp + WITHDRAW_COLLATERAL_FREEZE_PERIOD);
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
         collateralContract.withdraw(receiverAddress);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
@@ -208,19 +213,20 @@ contract CollateralContractTest is Test {
         uint128 RAVAggregateAmount = 158;
         uint64 timestampNs = 10;
         TAPVerifier.SignedRAV memory signed_rav =
-            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
 
         // get number of tokens in staking contract account before redeeming
         uint256 stakingBalance = mockERC20.balanceOf(address(staking));
 
-        // create proof of allocationID ownership
-        bytes memory proof = createAllocationIDOwnershipProof(
-            receiversAllocationID, SENDER_ADDRESS, address(collateralContract), receiversAllocationIDPrivateKey
-        );
-
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
-        vm.prank(receiverAddress);
-        collateralContract.redeem(signed_rav, proof);
+        redeemSignedRAV(
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
+        );
 
         remainingCollateral -= RAVAggregateAmount;
 
@@ -236,8 +242,14 @@ contract CollateralContractTest is Test {
 
         // expect revert when trying to redeem with the same allocation ID
         vm.expectRevert("Allocation ID already used");
-        vm.prank(receiverAddress);
-        collateralContract.redeem(signed_rav, proof);
+        redeemSignedRAV(
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
+        );
 
         // remaining collateral should not have changed
         assertEq(
@@ -256,23 +268,69 @@ contract CollateralContractTest is Test {
 
         // Create a RAV with same allocation ID but different signer/sender
         TAPVerifier.SignedRAV memory second_signed_rav =
-            createSignedRAV(receiversAllocationID, timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
-
-        // create proof of allocationID ownership
-        proof = createAllocationIDOwnershipProof(
-            receiversAllocationID, secondSenderAddress, address(collateralContract), receiversAllocationIDPrivateKey
-        );
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
 
         // get number of tokens in staking contract account before redeeming
         stakingBalance = mockERC20.balanceOf(address(staking));
 
         // should be able to redeem since the (sender, allocation ID) pair is unused
-        vm.prank(receiverAddress);
-        collateralContract.redeem(second_signed_rav, proof);
+        redeemSignedRAV(
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
+            receiverAddress,
+            secondSenderAddress,
+            address(collateralContract),
+            second_signed_rav
+        );
 
         // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
         stakingBalanceAfter = mockERC20.balanceOf(address(staking));
         assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
+    }
+
+    function testRevokeAuthorizedSigner() public {
+        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
+
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+        vm.prank(SENDER_ADDRESS);
+        collateralContract.thawSigner(authorizedsigners[0]);
+
+        // Simulate passing the freeze period
+        vm.warp(block.timestamp + REVOKE_SIGNER_FREEZE_PERIOD + 1);
+
+        // Create a rav signed by signer that is thawed for revocation
+        uint128 RAVAggregateAmount = 158;
+        uint64 timestampNs = 10;
+        TAPVerifier.SignedRAV memory signed_rav =
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+
+        // RAV's signed by authorized signer should still be valid until signer is revoked
+        redeemSignedRAV(
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
+        );
+
+        vm.prank(SENDER_ADDRESS);
+        collateralContract.revokeAuthorizedSigner(authorizedsigners[0]);
+
+        // expect revert when trying to redeem rav signed by revoked signer
+        // Create a rav signed by revoked signer
+        signed_rav =
+            createSignedRAV(receiversAllocationIDs[1], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
+
+        vm.expectRevert("Signer not authorized");
+        redeemSignedRAV(
+            receiversAllocationIDs[1],
+            receiversAllocationIDPrivateKeys[1],
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
+        );
     }
 
     function authorizeSignerWithProof(address sender, uint256 signerPivateKey, address signer) private {
@@ -331,5 +389,21 @@ contract CollateralContractTest is Test {
 
         // Create a SignedRAV structure with the RAV and its signature
         return TAPVerifier.SignedRAV(rav, abi.encodePacked(r, s, v));
+    }
+
+    function redeemSignedRAV(
+        address allocationID,
+        uint256 allocationIDPrivateKey,
+        address receiverAddress_,
+        address senderAddress,
+        address collateralContractAddress,
+        TAPVerifier.SignedRAV memory signedRAV
+    ) private {
+        // create proof of allocationID ownership
+        bytes memory proof = createAllocationIDOwnershipProof(
+            allocationID, senderAddress, address(collateralContractAddress), allocationIDPrivateKey
+        );
+        vm.prank(receiverAddress_);
+        collateralContract.redeem(signedRAV, proof);
     }
 }
