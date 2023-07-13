@@ -17,6 +17,12 @@ contract AllocationIDTracker {
     mapping(address sender => mapping(address allocationId => bool isUsed))
         private _sendersUsedAllocationIDs;
 
+    // Custom error to indicate the provided allocation ID was previously claimed and no longer valid
+    error AllocationIDPreviouslyClaimed();
+
+    // Custom error to indicate the provided proof is not valid
+    error InvalidProof();
+
     /**
      * @dev Emitted when an allocation ID is used.
      */
@@ -42,21 +48,20 @@ contract AllocationIDTracker {
      * @param sender The sender of the token to receiver.
      * @param allocationID The allocation ID to mark as used.
      * @param proof ECDSA Proof signed by the receiver consisting of packed (sender address, allocationID, collateral contract address).
-     * @notice REVERT: This function may revert if the allocation ID has already been used.
+     * @notice REVERT with error:
+     *               - AllocationIDPreviouslyClaimed: If the allocation ID was previously claimed
+     *               - InvalidProof: If the proof is not valid
      */
     function useAllocationID(
         address sender,
         address allocationID,
         bytes calldata proof
     ) external {
-        require(
-            !_sendersUsedAllocationIDs[sender][allocationID],
-            "Allocation ID already used"
-        );
-        require(
-            verifyProof(proof, sender, allocationID) == true,
-            "Proof is not valid"
-        );
+        if (_sendersUsedAllocationIDs[sender][allocationID] == true) {
+            revert AllocationIDPreviouslyClaimed();
+        }
+        verifyProof(proof, sender, allocationID);
+
         _sendersUsedAllocationIDs[sender][allocationID] = true;
         emit AllocationIDUsed(sender, allocationID);
     }
@@ -67,7 +72,8 @@ contract AllocationIDTracker {
      * @param sender The sender of the token to receiver.
      * @param allocationID The allocation ID to verify.
      * @return True if the proof is valid.
-     * @notice REVERT: This function may revert if the proof is not valid.
+     * @notice REVERT with error:
+     *               - InvalidProof: If the proof is not valid
      */
     function verifyProof(
         bytes calldata proof,
@@ -78,7 +84,9 @@ contract AllocationIDTracker {
             abi.encodePacked(sender, allocationID, msg.sender)
         );
         bytes32 digest = ECDSA.toEthSignedMessageHash(messageHash);
-        require(ECDSA.recover(digest, proof) == allocationID, "!proof");
+        if (ECDSA.recover(digest, proof) != allocationID) {
+            revert InvalidProof();
+        }
         return true;
     }
 }
