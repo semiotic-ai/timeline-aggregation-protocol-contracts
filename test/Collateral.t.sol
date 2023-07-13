@@ -170,6 +170,7 @@ contract CollateralContractTest is Test {
         depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
         uint256 partialCollateralAmount = COLLATERAL_AMOUNT / 10;
         uint256 partialFreezePeriod = WITHDRAW_COLLATERAL_FREEZE_PERIOD / 10;
+        uint256 expectedThawEnd = 0;
 
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(SENDER_ADDRESS);
@@ -177,13 +178,14 @@ contract CollateralContractTest is Test {
         for (uint256 i = 0; i < 10; i++) {
             // Sets msg.sender address for next contract calls until stop is called
             collateralContract.thaw(receiverAddress, partialCollateralAmount);
+            expectedThawEnd = block.timestamp + WITHDRAW_COLLATERAL_FREEZE_PERIOD;
 
             // Simulate passing partial freeze period
             vm.warp(block.timestamp + partialFreezePeriod);
         }
 
         // expected to revert because not enough time has passed since the last thaw request
-        vm.expectRevert("Collateral still thawing");
+        vm.expectRevert(abi.encodeWithSignature("CollateralStillThawing(uint256,uint256)", block.timestamp, expectedThawEnd));
         collateralContract.withdraw(receiverAddress);
 
         vm.warp(block.timestamp + WITHDRAW_COLLATERAL_FREEZE_PERIOD);
@@ -241,7 +243,7 @@ contract CollateralContractTest is Test {
         );
 
         // expect revert when trying to redeem with the same allocation ID
-        vm.expectRevert("Allocation ID already used");
+        vm.expectRevert(abi.encodeWithSignature("AllocationIDPreviouslyClaimed(address,address)", SENDER_ADDRESS, receiversAllocationIDs[0]));
         redeemSignedRAV(
             receiversAllocationIDs[0],
             receiversAllocationIDPrivateKeys[0],
@@ -318,11 +320,12 @@ contract CollateralContractTest is Test {
         collateralContract.revokeAuthorizedSigner(authorizedsigners[0]);
 
         // expect revert when trying to redeem rav signed by revoked signer
+
         // Create a rav signed by revoked signer
         signed_rav =
             createSignedRAV(receiversAllocationIDs[1], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
 
-        vm.expectRevert("Signer not authorized");
+        vm.expectRevert(Collateral.InvalidRAVSigner.selector);
         redeemSignedRAV(
             receiversAllocationIDs[1],
             receiversAllocationIDPrivateKeys[1],
