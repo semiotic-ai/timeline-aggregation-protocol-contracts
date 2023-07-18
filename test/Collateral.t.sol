@@ -159,6 +159,41 @@ contract CollateralContractTest is Test {
         assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
     }
 
+        function testRedeemRAVWithValueGreaterThanAvailableCollateral() public {
+        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
+
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+
+        // Create a signed rav
+        uint128 RAVAggregateAmount = 2 * uint128(COLLATERAL_AMOUNT);
+        uint64 timestampNs = 10;
+        TAPVerifier.SignedRAV memory signed_rav =
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+
+        // get number of tokens in staking contract account before redeeming
+        uint256 stakingBalance = mockERC20.balanceOf(address(staking));
+
+        // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
+        redeemSignedRAV(
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(collateralContract),
+            signed_rav
+        );
+
+        assertEq(
+            collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress),
+            uint128(0),
+            "Incorrect remaining collateral"
+        );
+
+        // get number of tokens in staking contract account after redeeming and check that it increased by the amount of remaining sender collateral
+        uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
+        assertEq(stakingBalanceAfter, stakingBalance + COLLATERAL_AMOUNT, "Incorrect receiver balance after redeeming");
+    }
+
     function testGetCollateralAmount() public {
         depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
 
