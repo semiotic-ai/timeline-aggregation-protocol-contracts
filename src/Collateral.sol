@@ -59,6 +59,39 @@ contract Collateral {
     // The duration (in seconds) in which a signer is thawing before they can be revoked
     uint256 public immutable revokeSignerThawingPeriod;
 
+    // Custom error to indicate insufficient collateral balance
+    error InsufficientCollateral(uint256 available, uint256 required);
+
+    // Custom error to indicate collateral is still thawing
+    error CollateralStillThawing(
+        uint256 currentTimestamp,
+        uint256 thawEndTimestamp
+    );
+
+    // Custom error to indicate collateral thawing has not been initiated
+    error CollateralNotThawing();
+
+    // Custom error to indicate invalid signer proof
+    error InvalidSignerProof();
+
+    // Custom error to indicate provided signer is not one of provided senders authorized signers
+    error SignerNotAuthorizedBySender(address signer, address sender);
+
+    // Custom error to indicate signer already authorized
+    error SignerAlreadyAuthorized(address signer, address authorizingSender);
+
+    // Custom error to indicate signer is still thawing
+    error SignerStillThawing(
+        uint256 currentTimestamp,
+        uint256 thawEndTimestamp
+    );
+
+    // Custom error to indicate signer thawing has not been initiated
+    error SignerNotThawing();
+
+    // Custom error to indicate invalid RAV signer
+    error InvalidRAVSigner();
+
     /**
      * @dev Emitted when collateral is deposited for a receiver.
      */
@@ -158,21 +191,26 @@ contract Collateral {
     }
 
     /**
-     * @dev Requests to thaw a specific amount of collateral from a receivers collateral account.
+     * @dev Requests to thaw a specific amount of collateral from a receiver's collateral account.
      * @param receiver Address of the receiver the collateral account is for.
      * @param amount Amount of collateral to thaw.
-     * @notice REVERT: this function will revert if the sender receiver collateral account does
-     *                 not have enough collateral (greater than `amount`).
+     * @notice REVERT with error:
+     *               - InsufficientCollateral: if the sender receiver collateral account does
+     *                 not have enough collateral (greater than `amount`)
      */
     function thaw(address receiver, uint256 amount) external {
         CollateralAccount storage account = collateralAccounts[msg.sender][
             receiver
         ];
         uint256 totalThawingRequested = account.amountThawing + amount;
-        require(
-            account.balance >= totalThawingRequested,
-            "Insufficient collateral balance"
-        );
+
+        // Check if the collateral balance is sufficient
+        if (account.balance < totalThawingRequested) {
+            revert InsufficientCollateral({
+                available: account.balance,
+                required: totalThawingRequested
+            });
+        }
 
         // Increase the amount being thawed
         account.amountThawing = totalThawingRequested;
@@ -191,21 +229,27 @@ contract Collateral {
     }
 
     /**
-     * @dev Withdraws all thawed collateral from a receivers collateral account.
+     * @dev Withdraws all thawed collateral from a receiver's collateral account.
      * @param receiver Address of the receiver.
-     * @notice REVERT: this function will revert if the sender receiver collateral account does
-     *                 not have any thawed collateral. This function will also revert if no thawing
-     *                 period has been completed.
+     * @notice REVERT with error:
+     *               - CollateralNotThawing: There is no collateral currently thawing
+     *               - CollateralStillThawing: ThawEndTimestamp has not been reached
+     *                 for collateral currently thawing
      */
     function withdraw(address receiver) external {
         CollateralAccount storage account = collateralAccounts[msg.sender][
             receiver
         ];
-        require(account.thawEndTimestamp != 0, "No collateral thawing");
-        require(
-            account.thawEndTimestamp <= block.timestamp,
-            "Collateral still thawing"
-        );
+        if (account.thawEndTimestamp == 0) {
+            revert CollateralNotThawing();
+        }
+
+        if (account.thawEndTimestamp > block.timestamp) {
+            revert CollateralStillThawing({
+                currentTimestamp: block.timestamp,
+                thawEndTimestamp: account.thawEndTimestamp
+            });
+        }
 
         // Amount is the minimum between the amount being thawed and the actual balance
         uint256 amount = account.amountThawing > account.balance
@@ -224,16 +268,21 @@ contract Collateral {
     /**
      * @dev Authorizes a signer to sign RAVs for the sender.
      * @param signer Address of the authorized signer.
+     * @param proof The proof provided by the signer to authorize the sender.
+     * @notice REVERT with error:
+     *               - SignerAlreadyAuthorized: Signer is currently authorized for a sender
+     *               - InvalidSignerProof: The provided signer proof is invalid
      */
     function authorizeSigner(address signer, bytes calldata proof) external {
-        require(
-            authorizedSigners[signer].sender == address(0),
-            "Signer already authorized"
-        );
-        require(
-            verifyAuthorizedSignerProof(proof, signer),
-            "Invalid signer proof"
-        );
+        if (authorizedSigners[signer].sender != address(0)) {
+            revert SignerAlreadyAuthorized(
+                signer,
+                authorizedSigners[signer].sender
+            );
+        }
+
+        verifyAuthorizedSignerProof(proof, signer);
+
         authorizedSigners[signer].sender = msg.sender;
         authorizedSigners[signer].thawEndTimestamp = 0;
         emit AuthorizeSigner(signer, msg.sender);
@@ -242,71 +291,99 @@ contract Collateral {
     /**
      * @dev Starts thawing a signer to be removed from the authorized signers list.
      * @param signer Address of the signer to remove.
+     * @notice REVERT with error:
+     *               - SignerNotAuthorizedBySender: The provided signer is either not authorized or
+     *                 authorized by a different sender
      */
     function thawSigner(address signer) external {
-        require(
-            authorizedSigners[signer].sender == msg.sender,
-            "Signer not authorized for sender"
-        );
-        authorizedSigners[signer].thawEndTimestamp =
+        SenderAuthorization storage authorization = authorizedSigners[signer];
+
+        if (authorization.sender != msg.sender) {
+            revert SignerNotAuthorizedBySender(
+                signer,
+                authorizedSigners[signer].sender
+            );
+        }
+
+        authorization.thawEndTimestamp =
             block.timestamp +
             revokeSignerThawingPeriod;
         emit ThawSigner(
-            authorizedSigners[signer].sender,
+            authorization.sender,
             signer,
-            authorizedSigners[signer].thawEndTimestamp
+            authorization.thawEndTimestamp
         );
     }
 
     /**
      * @dev Revokes a signer from the authorized signers list if thawed.
      * @param signer Address of the signer to remove.
+     * @notice REVERT with error:
+     *               - SignerNotAuthorizedBySender: The provided signer is either not authorized or
+     *                 authorized by a different sender
+     *               - SignerNotThawing: No thaw was initiated for the provided signer
+     *               - SignerStillThawing: ThawEndTimestamp has not been reached
+     *                 for provided signer
      */
     function revokeAuthorizedSigner(address signer) external {
-        require(
-            authorizedSigners[signer].sender == msg.sender,
-            "Signer not authorized for sender"
-        );
-        require(
-            authorizedSigners[signer].thawEndTimestamp != 0,
-            "Signer not thawing"
-        );
-        require(
-            authorizedSigners[signer].thawEndTimestamp <= block.timestamp,
-            "Signer still thawing"
-        );
+        SenderAuthorization storage authorization = authorizedSigners[signer];
+
+        if (authorization.sender != msg.sender) {
+            revert SignerNotAuthorizedBySender(
+                signer,
+                authorizedSigners[signer].sender
+            );
+        }
+
+        if (authorization.thawEndTimestamp == 0) {
+            revert SignerNotThawing();
+        }
+
+        if (authorization.thawEndTimestamp > block.timestamp) {
+            revert SignerStillThawing({
+                currentTimestamp: block.timestamp,
+                thawEndTimestamp: authorization.thawEndTimestamp
+            });
+        }
+
         delete authorizedSigners[signer];
-        emit RevokeAuthorizedSigner(authorizedSigners[signer].sender, signer);
+        emit RevokeAuthorizedSigner(authorization.sender, signer);
     }
 
     /**
      * @dev Redeems collateral for a receiver using a signed RAV.
      * @param signedRAV Signed RAV containing the receiver and collateral amount.
      * @param allocationIDProof Proof of allocationID ownership.
-     * @notice REVERT: this function will revert if:
-     *                  - the signer is not authorized to sign for a sender.
-     *                  - the sender receiver collateral account does not have enough
-     *                    collateral (greater than the amount in the RAV).
-     *                  - the allocation ID has already been used.
+     * @notice REVERT: This function may revert if ECDSA.recover fails, check Open Zeppelin ECDSA library for details.
+     * @notice REVERT with error:
+     *               - InvalidRAVSigner: If the RAV is signed by a signer who is not authorized by any sender
+     *               - InsufficientCollateral: If the sender associated with the RAV signer has less collateral
+     *                 than the value of the RAV
+     *               - AllocationIDTracker.AllocationIDPreviouslyClaimed: If the allocation ID was previously claimed
+     *               - AllocationIDTracker.InvalidProof: If the allocation ID ownership proof is not valid
      */
     function redeem(
         TAPVerifier.SignedRAV calldata signedRAV,
         bytes calldata allocationIDProof
     ) external {
         address signer = tapVerifier.recoverRAVSigner(signedRAV);
-        require(
-            authorizedSigners[signer].sender != address(0),
-            "Signer not authorized"
-        );
+
+        if (authorizedSigners[signer].sender == address(0)) {
+            revert InvalidRAVSigner();
+        }
 
         address sender = authorizedSigners[signer].sender;
         address receiver = msg.sender;
         uint256 amount = signedRAV.rav.valueAggregate;
         address allocationId = signedRAV.rav.allocationId;
-        require(
-            collateralAccounts[sender][receiver].balance >= amount,
-            "Insufficient collateral balance"
-        );
+
+        if (collateralAccounts[sender][receiver].balance < amount) {
+            revert InsufficientCollateral({
+                available: collateralAccounts[sender][receiver].balance,
+                required: amount
+            });
+        }
+
         unchecked {
             collateralAccounts[sender][receiver].balance -= amount;
         }
@@ -363,13 +440,13 @@ contract Collateral {
      * @dev Verifies a proof that authorizes the sender to authorize the signer.
      * @param proof The proof provided by the signer to authorize the sender.
      * @param signer The address of the signer being authorized.
-     * @return A boolean indicating whether the proof is valid.
-     * @notice REVERT: This function may revert if the proof is not valid.
+     * @notice REVERT with error:
+     *               - InvalidSignerProof: If the given proof is not valid
      */
     function verifyAuthorizedSignerProof(
         bytes calldata proof,
         address signer
-    ) private view returns (bool) {
+    ) private view {
         // Generate the hash of the sender's address
         bytes32 messageHash = keccak256(abi.encodePacked(msg.sender));
 
@@ -377,8 +454,8 @@ contract Collateral {
         bytes32 digest = ECDSA.toEthSignedMessageHash(messageHash);
 
         // Verify that the recovered signer matches the expected signer
-        require(ECDSA.recover(digest, proof) == signer, "Invalid proof");
-
-        return true;
+        if (ECDSA.recover(digest, proof) != signer) {
+            revert InvalidSignerProof();
+        }
     }
 }
