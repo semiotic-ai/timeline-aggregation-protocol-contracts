@@ -4,6 +4,7 @@ pragma solidity ^0.8.18;
 
 import "forge-std/Test.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {TAPVerifier} from "../src/TAPVerifier.sol";
 import {Escrow} from "../src/Escrow.sol";
 import {MockERC20Token} from "./MockERC20Token.sol";
@@ -46,7 +47,15 @@ contract EscrowContractTest is Test {
         assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
 
         escrowContract =
-        new Escrow(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), WITHDRAW_ESCROW_FREEZE_PERIOD, REVOKE_SIGNER_FREEZE_PERIOD);
+        new Escrow(
+            address(mockERC20),
+            address(staking),
+            address(tap_verifier),
+            address(allocationIDTracker),
+            WITHDRAW_ESCROW_FREEZE_PERIOD,
+            REVOKE_SIGNER_FREEZE_PERIOD,
+            3 days,
+            address(this));
 
         // Approve staking contract to transfer tokens from the escrow contract
         escrowContract.approveAll();
@@ -88,7 +97,7 @@ contract EscrowContractTest is Test {
     }
 
     function testDepositFunds() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT, true);
 
         vm.prank(SENDER_ADDRESS);
         uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
@@ -97,7 +106,7 @@ contract EscrowContractTest is Test {
     }
 
     function testWithdrawFundsAfterFreezePeriod() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT, true);
 
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(SENDER_ADDRESS);
@@ -121,7 +130,7 @@ contract EscrowContractTest is Test {
     }
 
     function testRedeemRAVSignedByAuthorizedSigner() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT, true);
         uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
 
@@ -160,7 +169,7 @@ contract EscrowContractTest is Test {
     }
 
         function testRedeemRAVWithValueGreaterThanAvailableEscrow() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT, true);
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
@@ -195,14 +204,14 @@ contract EscrowContractTest is Test {
     }
 
     function testGetEscrowAmount() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT, true);
 
         uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
     }
 
     function testMultipleThawRequests() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT, true);
         uint256 partialEscrowAmount = ESCROW_AMOUNT / 10;
         uint256 partialFreezePeriod = WITHDRAW_ESCROW_FREEZE_PERIOD / 10;
         uint256 expectedThawEnd = 0;
@@ -240,7 +249,7 @@ contract EscrowContractTest is Test {
 
     // test that the contract reverts when allocation ID is used more than once
     function testRevertOnDuplicateAllocationID() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT, true);
         uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
 
@@ -298,7 +307,7 @@ contract EscrowContractTest is Test {
         // create additional sender address to test that the contract does not revert when redeeming same allocation ID with a different sender
         address secondSenderAddress = address(0xa789);
         assert(mockERC20.transfer(secondSenderAddress, 10000000));
-        depositEscrow(secondSenderAddress, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(secondSenderAddress, receiverAddress, ESCROW_AMOUNT, true);
 
         // should not revert when redeeming same allocationID with a different sender
         authorizeSignerWithProof(secondSenderAddress, authorizedSignerPrivateKeys[1], authorizedsigners[1]);
@@ -326,7 +335,7 @@ contract EscrowContractTest is Test {
     }
 
     function testRevokeAuthorizedSigner() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT, true);
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
         vm.prank(SENDER_ADDRESS);
@@ -371,6 +380,34 @@ contract EscrowContractTest is Test {
         );
     }
 
+    function testAccessControlledFunctions() public {
+        string memory expectedErrorMessage = string(
+            abi.encodePacked(
+                "AccessControl: account ",
+                Strings.toHexString(SENDER_ADDRESS),
+                " is missing role ",
+                Strings.toHexString(uint256(escrowContract.AUTHORIZED_SENDER()), 32)
+            )
+        );
+        // Call functions as sender (who currently has no role and is not authorized to call these functions)
+        vm.startPrank(SENDER_ADDRESS);
+
+        vm.expectRevert(bytes(expectedErrorMessage));
+        escrowContract.deposit(receiverAddress, 10);
+        vm.expectRevert(bytes(expectedErrorMessage));
+        escrowContract.thaw(receiverAddress, 10);
+        vm.expectRevert(bytes(expectedErrorMessage));
+        escrowContract.withdraw(receiverAddress);
+        vm.expectRevert(bytes(expectedErrorMessage));
+        escrowContract.authorizeSigner(authorizedsigners[0], bytes("test"));
+        vm.expectRevert(bytes(expectedErrorMessage));
+        escrowContract.thawSigner(authorizedsigners[0]);
+        vm.expectRevert(bytes(expectedErrorMessage));
+        escrowContract.revokeAuthorizedSigner(authorizedsigners[0]);
+
+        vm.stopPrank();
+    }
+
     function authorizeSignerWithProof(address sender, uint256 signerPivateKey, address signer) private {
         bytes memory authSignerAuthorizesSenderProof = createAuthorizedSignerProof(sender, signerPivateKey);
 
@@ -402,7 +439,10 @@ contract EscrowContractTest is Test {
         return abi.encodePacked(r, s, v);
     }
 
-    function depositEscrow(address sender, address receiver, uint256 amount) public {
+    function depositEscrow(address sender, address receiver, uint256 amount, bool grantRole) public {
+        if( grantRole && !escrowContract.hasRole(escrowContract.AUTHORIZED_SENDER(), sender) ) {
+            escrowContract.grantRole(escrowContract.AUTHORIZED_SENDER(), sender);
+        }
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(sender);
         // Approve the escrow contract to transfer tokens from the sender

@@ -5,6 +5,7 @@ pragma solidity ^0.8.18;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts/access/AccessControlDefaultAdminRules.sol";
 import {TAPVerifier} from "./TAPVerifier.sol";
 import {AllocationIDTracker} from "./AllocationIDTracker.sol";
 import {IStaking} from "./IStaking.sol";
@@ -20,7 +21,7 @@ import {IStaking} from "./IStaking.sol";
  * @notice This contract uses the `TAPVerifier` contract for recovering signer addresses
  *         from `RAVs`.
  */
-contract Escrow {
+contract Escrow is AccessControlDefaultAdminRules {
     using SafeERC20 for IERC20;
 
     struct EscrowAccount {
@@ -33,6 +34,9 @@ contract Escrow {
         address sender; // Sender the signer is authorized to sign for
         uint256 thawEndTimestamp; // Block number at which thawing period ends (zero if not thawing)
     }
+
+    // Role for depositing escrow
+    bytes32 public constant AUTHORIZED_SENDER = keccak256("AUTHORIZED_SENDER");
 
     // Stores how much escrow each sender has deposited for each receiver, as well as thawing information
     mapping(address sender => mapping(address reciever => EscrowAccount escrowAccount))
@@ -162,8 +166,10 @@ contract Escrow {
         address tapVerifier_,
         address allocationIDTracker_,
         uint256 withdrawEscrowThawingPeriod_,
-        uint256 revokeSignerThawingPeriod_
-    ) {
+        uint256 revokeSignerThawingPeriod_,
+        uint48 accessControlInitialDelay,
+        address accessControlInitialDefaultAdmin
+    ) AccessControlDefaultAdminRules(accessControlInitialDelay, accessControlInitialDefaultAdmin) {
         escrowToken = IERC20(escrowToken_);
         staking = IStaking(staking_);
         tapVerifier = TAPVerifier(tapVerifier_);
@@ -187,7 +193,10 @@ contract Escrow {
      * @notice The escrow must be approved for transfer by the sender.
      * @notice REVERT: this function will revert if the escrow transfer fails.
      */
-    function deposit(address receiver, uint256 amount) external {
+    function deposit(
+        address receiver,
+        uint256 amount
+    ) external onlyRole(AUTHORIZED_SENDER) {
         escrowAccounts[msg.sender][receiver].balance += amount;
         escrowToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Deposit(msg.sender, receiver, amount);
@@ -201,7 +210,10 @@ contract Escrow {
      *               - InsufficientEscrow: if the sender receiver escrow account does
      *                 not have enough escrow (greater than `amount`)
      */
-    function thaw(address receiver, uint256 amount) external {
+    function thaw(
+        address receiver,
+        uint256 amount
+    ) external onlyRole(AUTHORIZED_SENDER) {
         EscrowAccount storage account = escrowAccounts[msg.sender][
             receiver
         ];
@@ -239,7 +251,7 @@ contract Escrow {
      *               - EscrowStillThawing: ThawEndTimestamp has not been reached
      *                 for escrow currently thawing
      */
-    function withdraw(address receiver) external {
+    function withdraw(address receiver) external onlyRole(AUTHORIZED_SENDER) {
         EscrowAccount storage account = escrowAccounts[msg.sender][
             receiver
         ];
@@ -276,7 +288,10 @@ contract Escrow {
      *               - SignerAlreadyAuthorized: Signer is currently authorized for a sender
      *               - InvalidSignerProof: The provided signer proof is invalid
      */
-    function authorizeSigner(address signer, bytes calldata proof) external {
+    function authorizeSigner(
+        address signer,
+        bytes calldata proof
+    ) external onlyRole(AUTHORIZED_SENDER) {
         if (authorizedSigners[signer].sender != address(0)) {
             revert SignerAlreadyAuthorized(
                 signer,
@@ -298,7 +313,7 @@ contract Escrow {
      *               - SignerNotAuthorizedBySender: The provided signer is either not authorized or
      *                 authorized by a different sender
      */
-    function thawSigner(address signer) external {
+    function thawSigner(address signer) external onlyRole(AUTHORIZED_SENDER) {
         SenderAuthorization storage authorization = authorizedSigners[signer];
 
         if (authorization.sender != msg.sender) {
@@ -328,7 +343,9 @@ contract Escrow {
      *               - SignerStillThawing: ThawEndTimestamp has not been reached
      *                 for provided signer
      */
-    function revokeAuthorizedSigner(address signer) external {
+    function revokeAuthorizedSigner(
+        address signer
+    ) external onlyRole(AUTHORIZED_SENDER) {
         SenderAuthorization storage authorization = authorizedSigners[signer];
 
         if (authorization.sender != msg.sender) {
