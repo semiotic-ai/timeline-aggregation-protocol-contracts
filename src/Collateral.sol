@@ -36,10 +36,10 @@ contract Collateral {
 
     // Stores how much collateral each sender has deposited for each receiver, as well as thawing information
     mapping(address sender => mapping(address reciever => CollateralAccount collateralAccount))
-        private collateralAccounts;
+        public collateralAccounts;
     // Map of signer to authorized signer information
     mapping(address signer => SenderAuthorization authorizedSigner)
-        private authorizedSigners;
+        public authorizedSigners;
 
     // The ERC20 token used for collateral
     IERC20 public immutable collateralToken;
@@ -413,19 +413,6 @@ contract Collateral {
         address receiver
     ) external view returns (uint256) {
         return collateralAccounts[sender][receiver].balance;
-    }
-
-    /**
-     * @dev Retrieves the collateral account details for a sender-receiver pair.
-     * @param sender Address of the sender.
-     * @param receiver Address of the receiver.
-     * @return The collateral account details.
-     */
-    function getCollateralAccount(
-        address sender,
-        address receiver
-    ) external view returns (CollateralAccount memory) {
-        return collateralAccounts[sender][receiver];
     }
 
     /**
