@@ -36,10 +36,10 @@ contract Collateral {
 
     // Stores how much collateral each sender has deposited for each receiver, as well as thawing information
     mapping(address sender => mapping(address reciever => CollateralAccount collateralAccount))
-        private collateralAccounts;
+        public collateralAccounts;
     // Map of signer to authorized signer information
     mapping(address signer => SenderAuthorization authorizedSigner)
-        private authorizedSigners;
+        public authorizedSigners;
 
     // The ERC20 token used for collateral
     IERC20 public immutable collateralToken;
@@ -103,12 +103,15 @@ contract Collateral {
 
     /**
      * @dev Emitted when collateral is redeemed by a receiver.
+     * @notice If the actual amount redeemed is less than the expected amount,
+     *         there was insufficient collateral available to redeem.
      */
     event Redeem(
         address indexed sender,
         address indexed receiver,
         address indexed allocationID,
-        uint256 amount
+        uint256 expectedAmount,
+        uint256 actualAmount
     );
 
     /**
@@ -351,14 +354,12 @@ contract Collateral {
     }
 
     /**
-     * @dev Redeems collateral for a receiver using a signed RAV.
+     * @dev Redeems collateral (up to amount available in collateral) for a receiver using a signed RAV.
      * @param signedRAV Signed RAV containing the receiver and collateral amount.
      * @param allocationIDProof Proof of allocationID ownership.
      * @notice REVERT: This function may revert if ECDSA.recover fails, check Open Zeppelin ECDSA library for details.
      * @notice REVERT with error:
      *               - InvalidRAVSigner: If the RAV is signed by a signer who is not authorized by any sender
-     *               - InsufficientCollateral: If the sender associated with the RAV signer has less collateral
-     *                 than the value of the RAV
      *               - AllocationIDTracker.AllocationIDPreviouslyClaimed: If the allocation ID was previously claimed
      *               - AllocationIDTracker.InvalidProof: If the allocation ID ownership proof is not valid
      */
@@ -374,15 +375,13 @@ contract Collateral {
 
         address sender = authorizedSigners[signer].sender;
         address receiver = msg.sender;
-        uint256 amount = signedRAV.rav.valueAggregate;
         address allocationId = signedRAV.rav.allocationId;
 
-        if (collateralAccounts[sender][receiver].balance < amount) {
-            revert InsufficientCollateral({
-                available: collateralAccounts[sender][receiver].balance,
-                required: amount
-            });
-        }
+        // Amount is the minimum between the amount owed on rav and the actual balance
+        uint256 amount = signedRAV.rav.valueAggregate >
+            collateralAccounts[sender][receiver].balance
+            ? collateralAccounts[sender][receiver].balance
+            : signedRAV.rav.valueAggregate;
 
         unchecked {
             collateralAccounts[sender][receiver].balance -= amount;
@@ -394,7 +393,13 @@ contract Collateral {
             allocationIDProof
         );
         staking.collect(amount, allocationId);
-        emit Redeem(sender, msg.sender, signedRAV.rav.allocationId, amount);
+        emit Redeem(
+            sender,
+            msg.sender,
+            signedRAV.rav.allocationId,
+            signedRAV.rav.valueAggregate,
+            amount
+        );
     }
 
     /**
@@ -408,19 +413,6 @@ contract Collateral {
         address receiver
     ) external view returns (uint256) {
         return collateralAccounts[sender][receiver].balance;
-    }
-
-    /**
-     * @dev Retrieves the collateral account details for a sender-receiver pair.
-     * @param sender Address of the sender.
-     * @param receiver Address of the receiver.
-     * @return The collateral account details.
-     */
-    function getCollateralAccount(
-        address sender,
-        address receiver
-    ) external view returns (CollateralAccount memory) {
-        return collateralAccounts[sender][receiver];
     }
 
     /**
