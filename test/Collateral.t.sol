@@ -31,7 +31,7 @@ contract CollateralContractTest is Test {
 
     function setUp() public {
         // Create an instance of the TAPVerifier contract
-        tap_verifier = new TAPVerifier();
+        tap_verifier = new TAPVerifier("TAP", "1.0.0");
 
         // set up mock ERC20 token
         mockERC20 = new MockERC20Token(1000000000);

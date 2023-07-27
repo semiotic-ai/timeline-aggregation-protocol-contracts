@@ -31,7 +31,7 @@ contract TAPVerifier is EIP712 {
     /**
      * @dev Constructs a new instance of the TAPVerifier contract.
      */
-    constructor() EIP712("TAP", "1.0.0") {}
+    constructor(string memory name, string memory version) EIP712(name, version) {}
 
     /**
      * @dev Recovers the signer address of a signed ReceiptAggregationVoucher (RAV).
