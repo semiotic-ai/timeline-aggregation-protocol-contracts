@@ -47,7 +47,7 @@ contract AllocationIDTracker {
      * @dev Marks an allocation ID as used.
      * @param sender The sender of the token to receiver.
      * @param allocationID The allocation ID to mark as used.
-     * @param proof ECDSA Proof signed by the receiver consisting of packed (sender address, allocationID, collateral contract address).
+     * @param proof ECDSA Proof signed by the receiver's allocationID consisting of packed (sender address, allocationID, collateral contract address).
      * @notice REVERT with error:
      *               - AllocationIDPreviouslyClaimed: If the allocation ID was previously claimed
      *               - InvalidProof: If the proof is not valid
@@ -68,7 +68,7 @@ contract AllocationIDTracker {
 
     /**
      * @dev Verifies a proof.
-     * @param proof ECDSA Proof signed by the receiver consisting of packed (sender address, allocationID, collateral contract address).
+     * @param proof ECDSA Proof signed by the receiver's allocationID consisting of packed (sender address, allocationID, collateral contract address).
      * @param sender The sender of the token to receiver.
      * @param allocationID The allocation ID to verify.
      * @notice REVERT with error:
