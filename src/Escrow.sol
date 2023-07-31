@@ -10,22 +10,22 @@ import {AllocationIDTracker} from "./AllocationIDTracker.sol";
 import {IStaking} from "./IStaking.sol";
 
 /**
- * @title Collateral
- * @dev This contract allows `senders` to deposit collateral for specific `receivers`,
+ * @title Escrow
+ * @dev This contract allows `senders` to deposit escrow for specific `receivers`,
  *      which can later be redeemed using Receipt Aggregate Vouchers (`RAV`) signed
- *      by an authorized `signer`. `Senders` can deposit collateral for `receivers`,
- *      authorize `signers` to create signed `RAVs`, and withdraw collateral after a
+ *      by an authorized `signer`. `Senders` can deposit escrow for `receivers`,
+ *      authorize `signers` to create signed `RAVs`, and withdraw escrow after a
  *      set `thawingPeriod` number of seconds. `Receivers` can redeem signed `RAVs` to
- *      claim collateral.
+ *      claim escrow.
  * @notice This contract uses the `TAPVerifier` contract for recovering signer addresses
  *         from `RAVs`.
  */
-contract Collateral {
+contract Escrow {
     using SafeERC20 for IERC20;
 
-    struct CollateralAccount {
-        uint256 balance; // Total collateral balance for a sender-receiver pair
-        uint256 amountThawing; // Amount of collateral currently being thawed
+    struct EscrowAccount {
+        uint256 balance; // Total escrow balance for a sender-receiver pair
+        uint256 amountThawing; // Amount of escrow currently being thawed
         uint256 thawEndTimestamp; // Block number at which thawing period ends (zero if not thawing)
     }
 
@@ -34,15 +34,15 @@ contract Collateral {
         uint256 thawEndTimestamp; // Block number at which thawing period ends (zero if not thawing)
     }
 
-    // Stores how much collateral each sender has deposited for each receiver, as well as thawing information
-    mapping(address sender => mapping(address reciever => CollateralAccount collateralAccount))
-        public collateralAccounts;
+    // Stores how much escrow each sender has deposited for each receiver, as well as thawing information
+    mapping(address sender => mapping(address reciever => EscrowAccount escrowAccount))
+        public escrowAccounts;
     // Map of signer to authorized signer information
     mapping(address signer => SenderAuthorization authorizedSigner)
         public authorizedSigners;
 
-    // The ERC20 token used for collateral
-    IERC20 public immutable collateralToken;
+    // The ERC20 token used for escrow
+    IERC20 public immutable escrowToken;
 
     // Graph staking contract
     IStaking public immutable staking;
@@ -53,23 +53,23 @@ contract Collateral {
     // The contract used for tracking used allocation IDs
     AllocationIDTracker public immutable allocationIDTracker;
 
-    // The duration (in seconds) in which collateral funds are thawing before they can be withdrawn
-    uint256 public immutable withdrawCollateralThawingPeriod;
+    // The duration (in seconds) in which escrow funds are thawing before they can be withdrawn
+    uint256 public immutable withdrawEscrowThawingPeriod;
 
     // The duration (in seconds) in which a signer is thawing before they can be revoked
     uint256 public immutable revokeSignerThawingPeriod;
 
-    // Custom error to indicate insufficient collateral balance
-    error InsufficientCollateral(uint256 available, uint256 required);
+    // Custom error to indicate insufficient escrow balance
+    error InsufficientEscrow(uint256 available, uint256 required);
 
-    // Custom error to indicate collateral is still thawing
-    error CollateralStillThawing(
+    // Custom error to indicate escrow is still thawing
+    error EscrowStillThawing(
         uint256 currentTimestamp,
         uint256 thawEndTimestamp
     );
 
-    // Custom error to indicate collateral thawing has not been initiated
-    error CollateralNotThawing();
+    // Custom error to indicate escrow thawing has not been initiated
+    error EscrowNotThawing();
 
     // Custom error to indicate invalid signer proof
     error InvalidSignerProof();
@@ -93,7 +93,7 @@ contract Collateral {
     error InvalidRAVSigner();
 
     /**
-     * @dev Emitted when collateral is deposited for a receiver.
+     * @dev Emitted when escrow is deposited for a receiver.
      */
     event Deposit(
         address indexed sender,
@@ -102,9 +102,9 @@ contract Collateral {
     );
 
     /**
-     * @dev Emitted when collateral is redeemed by a receiver.
+     * @dev Emitted when escrow is redeemed by a receiver.
      * @notice If the actual amount redeemed is less than the expected amount,
-     *         there was insufficient collateral available to redeem.
+     *         there was insufficient escrow available to redeem.
      */
     event Redeem(
         address indexed sender,
@@ -115,7 +115,7 @@ contract Collateral {
     );
 
     /**
-     * @dev Emitted when a thaw request is made for collateral.
+     * @dev Emitted when a thaw request is made for escrow.
      */
     event Thaw(
         address indexed sender,
@@ -143,7 +143,7 @@ contract Collateral {
     );
 
     /**
-     * @dev Emitted when thawed collateral is withdrawn by the sender.
+     * @dev Emitted when thawed escrow is withdrawn by the sender.
      */
     event Withdraw(
         address indexed sender,
@@ -157,18 +157,18 @@ contract Collateral {
     event AuthorizeSigner(address indexed signer, address indexed sender);
 
     constructor(
-        address collateralToken_,
+        address escrowToken_,
         address staking_,
         address tapVerifier_,
         address allocationIDTracker_,
-        uint256 withdrawCollateralThawingPeriod_,
+        uint256 withdrawEscrowThawingPeriod_,
         uint256 revokeSignerThawingPeriod_
     ) {
-        collateralToken = IERC20(collateralToken_);
+        escrowToken = IERC20(escrowToken_);
         staking = IStaking(staking_);
         tapVerifier = TAPVerifier(tapVerifier_);
         allocationIDTracker = AllocationIDTracker(allocationIDTracker_);
-        withdrawCollateralThawingPeriod = withdrawCollateralThawingPeriod_;
+        withdrawEscrowThawingPeriod = withdrawEscrowThawingPeriod_;
         revokeSignerThawingPeriod = revokeSignerThawingPeriod_;
     }
 
@@ -177,39 +177,39 @@ contract Collateral {
      * @dev Increased gas efficiency instead of approving on each voucher redeem
      */
     function approveAll() external {
-        collateralToken.approve(address(staking), type(uint256).max);
+        escrowToken.approve(address(staking), type(uint256).max);
     }
 
     /**
-     * @dev Deposits collateral for a receiver.
+     * @dev Deposits escrow for a receiver.
      * @param receiver Address of the receiver.
-     * @param amount Amount of collateral to deposit.
-     * @notice The collateral must be approved for transfer by the sender.
-     * @notice REVERT: this function will revert if the collateral transfer fails.
+     * @param amount Amount of escrow to deposit.
+     * @notice The escrow must be approved for transfer by the sender.
+     * @notice REVERT: this function will revert if the escrow transfer fails.
      */
     function deposit(address receiver, uint256 amount) external {
-        collateralAccounts[msg.sender][receiver].balance += amount;
-        collateralToken.safeTransferFrom(msg.sender, address(this), amount);
+        escrowAccounts[msg.sender][receiver].balance += amount;
+        escrowToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Deposit(msg.sender, receiver, amount);
     }
 
     /**
-     * @dev Requests to thaw a specific amount of collateral from a receiver's collateral account.
-     * @param receiver Address of the receiver the collateral account is for.
-     * @param amount Amount of collateral to thaw.
+     * @dev Requests to thaw a specific amount of escrow from a receiver's escrow account.
+     * @param receiver Address of the receiver the escrow account is for.
+     * @param amount Amount of escrow to thaw.
      * @notice REVERT with error:
-     *               - InsufficientCollateral: if the sender receiver collateral account does
-     *                 not have enough collateral (greater than `amount`)
+     *               - InsufficientEscrow: if the sender receiver escrow account does
+     *                 not have enough escrow (greater than `amount`)
      */
     function thaw(address receiver, uint256 amount) external {
-        CollateralAccount storage account = collateralAccounts[msg.sender][
+        EscrowAccount storage account = escrowAccounts[msg.sender][
             receiver
         ];
         uint256 totalThawingRequested = account.amountThawing + amount;
 
-        // Check if the collateral balance is sufficient
+        // Check if the escrow balance is sufficient
         if (account.balance < totalThawingRequested) {
-            revert InsufficientCollateral({
+            revert InsufficientEscrow({
                 available: account.balance,
                 required: totalThawingRequested
             });
@@ -220,7 +220,7 @@ contract Collateral {
         // Set when the thaw is complete (thawing period number of seconds after current timestamp)
         account.thawEndTimestamp =
             block.timestamp +
-            withdrawCollateralThawingPeriod;
+            withdrawEscrowThawingPeriod;
 
         emit Thaw(
             msg.sender,
@@ -232,23 +232,23 @@ contract Collateral {
     }
 
     /**
-     * @dev Withdraws all thawed collateral from a receiver's collateral account.
+     * @dev Withdraws all thawed escrow from a receiver's escrow account.
      * @param receiver Address of the receiver.
      * @notice REVERT with error:
-     *               - CollateralNotThawing: There is no collateral currently thawing
-     *               - CollateralStillThawing: ThawEndTimestamp has not been reached
-     *                 for collateral currently thawing
+     *               - EscrowNotThawing: There is no escrow currently thawing
+     *               - EscrowStillThawing: ThawEndTimestamp has not been reached
+     *                 for escrow currently thawing
      */
     function withdraw(address receiver) external {
-        CollateralAccount storage account = collateralAccounts[msg.sender][
+        EscrowAccount storage account = escrowAccounts[msg.sender][
             receiver
         ];
         if (account.thawEndTimestamp == 0) {
-            revert CollateralNotThawing();
+            revert EscrowNotThawing();
         }
 
         if (account.thawEndTimestamp > block.timestamp) {
-            revert CollateralStillThawing({
+            revert EscrowStillThawing({
                 currentTimestamp: block.timestamp,
                 thawEndTimestamp: account.thawEndTimestamp
             });
@@ -264,7 +264,7 @@ contract Collateral {
         }
         account.amountThawing = 0;
         account.thawEndTimestamp = 0;
-        collateralToken.safeTransfer(msg.sender, amount);
+        escrowToken.safeTransfer(msg.sender, amount);
         emit Withdraw(msg.sender, receiver, amount);
     }
 
@@ -354,8 +354,8 @@ contract Collateral {
     }
 
     /**
-     * @dev Redeems collateral (up to amount available in collateral) for a receiver using a signed RAV.
-     * @param signedRAV Signed RAV containing the receiver and collateral amount.
+     * @dev Redeems escrow (up to amount available in escrow) for a receiver using a signed RAV.
+     * @param signedRAV Signed RAV containing the receiver and escrow amount.
      * @param allocationIDProof Proof of allocationID ownership.
      * @notice REVERT: This function may revert if ECDSA.recover fails, check Open Zeppelin ECDSA library for details.
      * @notice REVERT with error:
@@ -379,12 +379,12 @@ contract Collateral {
 
         // Amount is the minimum between the amount owed on rav and the actual balance
         uint256 amount = signedRAV.rav.valueAggregate >
-            collateralAccounts[sender][receiver].balance
-            ? collateralAccounts[sender][receiver].balance
+            escrowAccounts[sender][receiver].balance
+            ? escrowAccounts[sender][receiver].balance
             : signedRAV.rav.valueAggregate;
 
         unchecked {
-            collateralAccounts[sender][receiver].balance -= amount;
+            escrowAccounts[sender][receiver].balance -= amount;
         }
 
         allocationIDTracker.useAllocationID(
@@ -403,29 +403,29 @@ contract Collateral {
     }
 
     /**
-     * @dev Retrieves the amount of collateral deposited by a sender for a receiver.
+     * @dev Retrieves the amount of escrow deposited by a sender for a receiver.
      * @param sender Address of the sender.
      * @param receiver Address of the receiver.
-     * @return The amount of collateral deposited.
+     * @return The amount of escrow deposited.
      */
-    function getCollateralAmount(
+    function getEscrowAmount(
         address sender,
         address receiver
     ) external view returns (uint256) {
-        return collateralAccounts[sender][receiver].balance;
+        return escrowAccounts[sender][receiver].balance;
     }
 
     /**
-     * @dev Retrieves the collateral account details for a sender-receiver pair of the sender that a signer is authorized for.
+     * @dev Retrieves the escrow account details for a sender-receiver pair of the sender that a signer is authorized for.
      * @param signer Address of the authorized signer.
      * @param receiver Address of the receiver.
-     * @return The collateral account details.
+     * @return The escrow account details.
      */
-    function getCollateralAccountFromSignerAddress(
+    function getEscrowAccountFromSignerAddress(
         address signer,
         address receiver
-    ) external view returns (CollateralAccount memory) {
-        return collateralAccounts[authorizedSigners[signer].sender][receiver];
+    ) external view returns (EscrowAccount memory) {
+        return escrowAccounts[authorizedSigners[signer].sender][receiver];
     }
 
     /**

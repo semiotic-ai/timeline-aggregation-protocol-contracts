@@ -5,20 +5,20 @@ pragma solidity ^0.8.18;
 import "forge-std/Test.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {TAPVerifier} from "../src/TAPVerifier.sol";
-import {Collateral} from "../src/Collateral.sol";
+import {Escrow} from "../src/Escrow.sol";
 import {MockERC20Token} from "./MockERC20Token.sol";
 import {AllocationIDTracker} from "../src/AllocationIDTracker.sol";
 import {MockStaking} from "./MockStaking.sol";
 
-contract CollateralContractTest is Test {
+contract EscrowContractTest is Test {
     address private constant SENDER_ADDRESS = address(0x789);
-    uint256 private constant COLLATERAL_AMOUNT = 1000;
-    uint256 private constant WITHDRAW_COLLATERAL_FREEZE_PERIOD = 800;
+    uint256 private constant ESCROW_AMOUNT = 1000;
+    uint256 private constant WITHDRAW_ESCROW_FREEZE_PERIOD = 800;
     uint256 private constant REVOKE_SIGNER_FREEZE_PERIOD = 800;
 
     MockERC20Token private mockERC20;
     MockStaking private staking;
-    Collateral private collateralContract;
+    Escrow private escrowContract;
     TAPVerifier private tap_verifier;
 
     uint256[] internal authorizedSignerPrivateKeys;
@@ -45,11 +45,11 @@ contract CollateralContractTest is Test {
         // give sender tokens
         assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
 
-        collateralContract =
-        new Collateral(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), WITHDRAW_COLLATERAL_FREEZE_PERIOD, REVOKE_SIGNER_FREEZE_PERIOD);
+        escrowContract =
+        new Escrow(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), WITHDRAW_ESCROW_FREEZE_PERIOD, REVOKE_SIGNER_FREEZE_PERIOD);
 
-        // Approve staking contract to transfer tokens from the collateral contract
-        collateralContract.approveAll();
+        // Approve staking contract to transfer tokens from the escrow contract
+        escrowContract.approveAll();
 
         // Set up the signer to be authorized for signing rav's
         string memory signerMnemonic =
@@ -82,48 +82,48 @@ contract CollateralContractTest is Test {
         vm.label(receiversAllocationIDs[0], "receiversAllocationID");
         vm.label(authorizedsigners[0], "authorizedsigner_0");
         vm.label(authorizedsigners[1], "authorizedsigner_1");
-        vm.label(address(collateralContract), "collateralContract");
+        vm.label(address(escrowContract), "escrowContract");
         vm.label(address(mockERC20), "mockERC20");
         vm.label(address(tap_verifier), "tap_verifier");
     }
 
     function testDepositFunds() public {
-        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
 
         vm.prank(SENDER_ADDRESS);
-        uint256 depositedAmount = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
+        uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
 
-        assertEq(depositedAmount, COLLATERAL_AMOUNT, "Incorrect deposited amount");
+        assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
     }
 
     function testWithdrawFundsAfterFreezePeriod() public {
-        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
 
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(SENDER_ADDRESS);
-        collateralContract.thaw(receiverAddress, COLLATERAL_AMOUNT);
+        escrowContract.thaw(receiverAddress, ESCROW_AMOUNT);
 
         // Simulate passing the freeze period
-        vm.warp(block.timestamp + WITHDRAW_COLLATERAL_FREEZE_PERIOD + 1);
+        vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
 
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
-        collateralContract.withdraw(receiverAddress);
+        escrowContract.withdraw(receiverAddress);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
 
-        assertEq(removedAmount, COLLATERAL_AMOUNT, "Incorrect removed amount");
+        assertEq(removedAmount, ESCROW_AMOUNT, "Incorrect removed amount");
 
-        uint256 remainingAmount = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
+        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingAmount, 0, "Incorrect remaining amount");
         // Stop setting msg.sender address for any remaining contract calls
         vm.stopPrank();
     }
 
     function testRedeemRAVSignedByAuthorizedSigner() public {
-        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
-        uint256 remainingCollateral = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
-        assertEq(remainingCollateral, COLLATERAL_AMOUNT, "Incorrect remaining collateral");
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
@@ -142,16 +142,16 @@ contract CollateralContractTest is Test {
             receiversAllocationIDPrivateKeys[0],
             receiverAddress,
             SENDER_ADDRESS,
-            address(collateralContract),
+            address(escrowContract),
             signed_rav
         );
 
-        remainingCollateral -= RAVAggregateAmount;
+        remainingEscrow -= RAVAggregateAmount;
 
         assertEq(
-            collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress),
-            remainingCollateral,
-            "Incorrect remaining collateral"
+            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress),
+            remainingEscrow,
+            "Incorrect remaining escrow"
         );
 
         // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
@@ -159,13 +159,13 @@ contract CollateralContractTest is Test {
         assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
     }
 
-        function testRedeemRAVWithValueGreaterThanAvailableCollateral() public {
-        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
+        function testRedeemRAVWithValueGreaterThanAvailableEscrow() public {
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
         // Create a signed rav
-        uint128 RAVAggregateAmount = 2 * uint128(COLLATERAL_AMOUNT);
+        uint128 RAVAggregateAmount = 2 * uint128(ESCROW_AMOUNT);
         uint64 timestampNs = 10;
         TAPVerifier.SignedRAV memory signed_rav =
             createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
@@ -179,32 +179,32 @@ contract CollateralContractTest is Test {
             receiversAllocationIDPrivateKeys[0],
             receiverAddress,
             SENDER_ADDRESS,
-            address(collateralContract),
+            address(escrowContract),
             signed_rav
         );
 
         assertEq(
-            collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress),
+            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress),
             uint128(0),
-            "Incorrect remaining collateral"
+            "Incorrect remaining escrow"
         );
 
-        // get number of tokens in staking contract account after redeeming and check that it increased by the amount of remaining sender collateral
+        // get number of tokens in staking contract account after redeeming and check that it increased by the amount of remaining sender escrow
         uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
-        assertEq(stakingBalanceAfter, stakingBalance + COLLATERAL_AMOUNT, "Incorrect receiver balance after redeeming");
+        assertEq(stakingBalanceAfter, stakingBalance + ESCROW_AMOUNT, "Incorrect receiver balance after redeeming");
     }
 
-    function testGetCollateralAmount() public {
-        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
+    function testGetEscrowAmount() public {
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
 
-        uint256 depositedAmount = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
-        assertEq(depositedAmount, COLLATERAL_AMOUNT, "Incorrect deposited amount");
+        uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
     }
 
     function testMultipleThawRequests() public {
-        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
-        uint256 partialCollateralAmount = COLLATERAL_AMOUNT / 10;
-        uint256 partialFreezePeriod = WITHDRAW_COLLATERAL_FREEZE_PERIOD / 10;
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        uint256 partialEscrowAmount = ESCROW_AMOUNT / 10;
+        uint256 partialFreezePeriod = WITHDRAW_ESCROW_FREEZE_PERIOD / 10;
         uint256 expectedThawEnd = 0;
 
         // Sets msg.sender address for next contract calls until stop is called
@@ -212,27 +212,27 @@ contract CollateralContractTest is Test {
 
         for (uint256 i = 0; i < 10; i++) {
             // Sets msg.sender address for next contract calls until stop is called
-            collateralContract.thaw(receiverAddress, partialCollateralAmount);
-            expectedThawEnd = block.timestamp + WITHDRAW_COLLATERAL_FREEZE_PERIOD;
+            escrowContract.thaw(receiverAddress, partialEscrowAmount);
+            expectedThawEnd = block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD;
 
             // Simulate passing partial freeze period
             vm.warp(block.timestamp + partialFreezePeriod);
         }
 
         // expected to revert because not enough time has passed since the last thaw request
-        vm.expectRevert(abi.encodeWithSignature("CollateralStillThawing(uint256,uint256)", block.timestamp, expectedThawEnd));
-        collateralContract.withdraw(receiverAddress);
+        vm.expectRevert(abi.encodeWithSignature("EscrowStillThawing(uint256,uint256)", block.timestamp, expectedThawEnd));
+        escrowContract.withdraw(receiverAddress);
 
-        vm.warp(block.timestamp + WITHDRAW_COLLATERAL_FREEZE_PERIOD);
+        vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD);
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
-        collateralContract.withdraw(receiverAddress);
+        escrowContract.withdraw(receiverAddress);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
 
-        assertEq(removedAmount, COLLATERAL_AMOUNT, "Incorrect removed amount");
+        assertEq(removedAmount, ESCROW_AMOUNT, "Incorrect removed amount");
 
-        uint256 remainingAmount = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
+        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingAmount, 0, "Incorrect remaining amount");
         // Stop setting msg.sender address for any remaining contract calls
         vm.stopPrank();
@@ -240,9 +240,9 @@ contract CollateralContractTest is Test {
 
     // test that the contract reverts when allocation ID is used more than once
     function testRevertOnDuplicateAllocationID() public {
-        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
-        uint256 remainingCollateral = collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress);
-        assertEq(remainingCollateral, COLLATERAL_AMOUNT, "Incorrect remaining collateral");
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
@@ -261,19 +261,19 @@ contract CollateralContractTest is Test {
             receiversAllocationIDPrivateKeys[0],
             receiverAddress,
             SENDER_ADDRESS,
-            address(collateralContract),
+            address(escrowContract),
             signed_rav
         );
 
-        remainingCollateral -= RAVAggregateAmount;
+        remainingEscrow -= RAVAggregateAmount;
 
         // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
         uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
         assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
 
         assertEq(
-            collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress),
-            remainingCollateral,
+            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress),
+            remainingEscrow,
             "Incorrect remaining amount"
         );
 
@@ -284,21 +284,21 @@ contract CollateralContractTest is Test {
             receiversAllocationIDPrivateKeys[0],
             receiverAddress,
             SENDER_ADDRESS,
-            address(collateralContract),
+            address(escrowContract),
             signed_rav
         );
 
-        // remaining collateral should not have changed
+        // remaining escrow should not have changed
         assertEq(
-            collateralContract.getCollateralAmount(SENDER_ADDRESS, receiverAddress),
-            remainingCollateral,
+            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress),
+            remainingEscrow,
             "Incorrect remaining amount"
         );
 
         // create additional sender address to test that the contract does not revert when redeeming same allocation ID with a different sender
         address secondSenderAddress = address(0xa789);
         assert(mockERC20.transfer(secondSenderAddress, 10000000));
-        depositCollateral(secondSenderAddress, receiverAddress, COLLATERAL_AMOUNT);
+        depositEscrow(secondSenderAddress, receiverAddress, ESCROW_AMOUNT);
 
         // should not revert when redeeming same allocationID with a different sender
         authorizeSignerWithProof(secondSenderAddress, authorizedSignerPrivateKeys[1], authorizedsigners[1]);
@@ -316,7 +316,7 @@ contract CollateralContractTest is Test {
             receiversAllocationIDPrivateKeys[0],
             receiverAddress,
             secondSenderAddress,
-            address(collateralContract),
+            address(escrowContract),
             second_signed_rav
         );
 
@@ -326,11 +326,11 @@ contract CollateralContractTest is Test {
     }
 
     function testRevokeAuthorizedSigner() public {
-        depositCollateral(SENDER_ADDRESS, receiverAddress, COLLATERAL_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
         vm.prank(SENDER_ADDRESS);
-        collateralContract.thawSigner(authorizedsigners[0]);
+        escrowContract.thawSigner(authorizedsigners[0]);
 
         // Simulate passing the freeze period
         vm.warp(block.timestamp + REVOKE_SIGNER_FREEZE_PERIOD + 1);
@@ -347,12 +347,12 @@ contract CollateralContractTest is Test {
             receiversAllocationIDPrivateKeys[0],
             receiverAddress,
             SENDER_ADDRESS,
-            address(collateralContract),
+            address(escrowContract),
             signed_rav
         );
 
         vm.prank(SENDER_ADDRESS);
-        collateralContract.revokeAuthorizedSigner(authorizedsigners[0]);
+        escrowContract.revokeAuthorizedSigner(authorizedsigners[0]);
 
         // expect revert when trying to redeem rav signed by revoked signer
 
@@ -360,13 +360,13 @@ contract CollateralContractTest is Test {
         signed_rav =
             createSignedRAV(receiversAllocationIDs[1], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
 
-        vm.expectRevert(Collateral.InvalidRAVSigner.selector);
+        vm.expectRevert(Escrow.InvalidRAVSigner.selector);
         redeemSignedRAV(
             receiversAllocationIDs[1],
             receiversAllocationIDPrivateKeys[1],
             receiverAddress,
             SENDER_ADDRESS,
-            address(collateralContract),
+            address(escrowContract),
             signed_rav
         );
     }
@@ -376,7 +376,7 @@ contract CollateralContractTest is Test {
 
         // Authorize the signer
         vm.prank(sender);
-        collateralContract.authorizeSigner(signer, authSignerAuthorizesSenderProof);
+        escrowContract.authorizeSigner(signer, authSignerAuthorizesSenderProof);
     }
 
     function createAuthorizedSignerProof(address sender, uint256 signerPrivateKey)
@@ -393,21 +393,21 @@ contract CollateralContractTest is Test {
     function createAllocationIDOwnershipProof(
         address allocationID,
         address sender,
-        address collateralContractAddress,
+        address escrowContractAddress,
         uint256 allocationIDPrivateKey
     ) private pure returns (bytes memory) {
-        bytes32 messageHash = keccak256(abi.encodePacked(sender, allocationID, collateralContractAddress));
+        bytes32 messageHash = keccak256(abi.encodePacked(sender, allocationID, escrowContractAddress));
         bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(allocationIDPrivateKey, allocationIDdigest);
         return abi.encodePacked(r, s, v);
     }
 
-    function depositCollateral(address sender, address receiver, uint256 amount) public {
+    function depositEscrow(address sender, address receiver, uint256 amount) public {
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(sender);
-        // Approve the collateral contract to transfer tokens from the sender
-        mockERC20.approve(address(collateralContract), amount);
-        collateralContract.deposit(receiver, amount);
+        // Approve the escrow contract to transfer tokens from the sender
+        mockERC20.approve(address(escrowContract), amount);
+        escrowContract.deposit(receiver, amount);
         vm.stopPrank();
     }
 
@@ -434,14 +434,14 @@ contract CollateralContractTest is Test {
         uint256 allocationIDPrivateKey,
         address receiverAddress_,
         address senderAddress,
-        address collateralContractAddress,
+        address escrowContractAddress,
         TAPVerifier.SignedRAV memory signedRAV
     ) private {
         // create proof of allocationID ownership
         bytes memory proof = createAllocationIDOwnershipProof(
-            allocationID, senderAddress, address(collateralContractAddress), allocationIDPrivateKey
+            allocationID, senderAddress, address(escrowContractAddress), allocationIDPrivateKey
         );
         vm.prank(receiverAddress_);
-        collateralContract.redeem(signedRAV, proof);
+        escrowContract.redeem(signedRAV, proof);
     }
 }

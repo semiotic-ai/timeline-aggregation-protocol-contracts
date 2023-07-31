@@ -7,10 +7,10 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 /**
  * @title AllocationIDTracker
  * @dev This contract tracks the allocation IDs of the RAVs that have been submitted to
- *      ensure that each allocation ID is only used once. It is external to collateral
- *      contract to allow for updating the collateral contract without losing the list of
+ *      ensure that each allocation ID is only used once. It is external to escrow
+ *      contract to allow for updating the escrow contract without losing the list of
  *      used allocation IDs.
- * @notice This contract is intended to be used with the `Collateral` contract.
+ * @notice This contract is intended to be used with the `Escrow` contract.
  */
 contract AllocationIDTracker {
     // senders used allocation IDs
