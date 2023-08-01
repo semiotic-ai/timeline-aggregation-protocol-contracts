@@ -16,7 +16,7 @@ contract TAPVerifierTest is Test {
     address internal signer;
 
     function setUp() public {
-        tap_verifier = new TAPVerifier();
+        tap_verifier = new TAPVerifier("TAP", "1.0.0");
 
         // Set up the signer for testing purposes
         string memory signerMnemonic =
