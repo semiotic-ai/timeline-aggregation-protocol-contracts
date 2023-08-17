@@ -26,12 +26,12 @@ contract Escrow {
     struct EscrowAccount {
         uint256 balance; // Total escrow balance for a sender-receiver pair
         uint256 amountThawing; // Amount of escrow currently being thawed
-        uint256 thawEndTimestamp; // Block number at which thawing period ends (zero if not thawing)
+        uint256 thawEndTimestamp; // Timestamp at which thawing period ends (zero if not thawing)
     }
 
     struct SenderAuthorization {
         address sender; // Sender the signer is authorized to sign for
-        uint256 thawEndTimestamp; // Block number at which thawing period ends (zero if not thawing)
+        uint256 thawEndTimestamp; // Timestamp at which thawing period ends (zero if not thawing)
     }
 
     // Stores how much escrow each sender has deposited for each receiver, as well as thawing information
