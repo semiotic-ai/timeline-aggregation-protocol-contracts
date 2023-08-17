@@ -11,14 +11,14 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
  * @dev A contract for verifying receipt aggregation vouchers.
  */
 contract TAPVerifier is EIP712 {
-    struct ReceiptAggregationVoucher {
+    struct ReceiptAggregateVoucher {
         address allocationId;
         uint64 timestampNs;
         uint128 valueAggregate;
     }
 
     struct SignedRAV {
-        ReceiptAggregationVoucher rav;
+        ReceiptAggregateVoucher rav;
         bytes signature; // 65 bytes: r (32 Bytes) || s (32 Bytes) || v (1 Byte)
     }
 
@@ -34,7 +34,7 @@ contract TAPVerifier is EIP712 {
     constructor(string memory name, string memory version) EIP712(name, version) {}
 
     /**
-     * @dev Recovers the signer address of a signed ReceiptAggregationVoucher (RAV).
+     * @dev Recovers the signer address of a signed ReceiptAggregateVoucher (RAV).
      * @param signedRAV The SignedRAV containing the RAV and its signature.
      * @return The address of the signer.
      * @notice REVERT: This function may revert if ECDSA.recover fails, check ECDSA library for details.
@@ -61,12 +61,12 @@ contract TAPVerifier is EIP712 {
     }
 
     /**
-     * @dev Computes the hash of a ReceiptAggregationVoucher (RAV).
+     * @dev Computes the hash of a ReceiptAggregateVoucher (RAV).
      * @param rav The RAV for which to compute the hash.
      * @return The hash of the RAV.
      */
     function hashRAV(
-        ReceiptAggregationVoucher calldata rav
+        ReceiptAggregateVoucher calldata rav
     ) public view returns (bytes32) {
         return
             _hashTypedDataV4(
