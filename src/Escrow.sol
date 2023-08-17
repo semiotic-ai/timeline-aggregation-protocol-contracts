@@ -62,6 +62,9 @@ contract Escrow {
     // Custom error to indicate insufficient escrow balance
     error InsufficientEscrow(uint256 available, uint256 required);
 
+    // Custom error to indicate insufficient thaw amount (must be greater than 0)
+    error InsufficientThawAmount();
+
     // Custom error to indicate escrow is still thawing
     error EscrowStillThawing(
         uint256 currentTimestamp,
@@ -202,6 +205,9 @@ contract Escrow {
      *                 not have enough escrow (greater than `amount`)
      */
     function thaw(address receiver, uint256 amount) external {
+        if(amount <= 0) {
+            revert InsufficientThawAmount();
+        }
         EscrowAccount storage account = escrowAccounts[msg.sender][
             receiver
         ];
