@@ -418,8 +418,8 @@ contract EscrowContractTest is Test {
         uint256 authorizedSignerPrivateKey
     ) private view returns (TAPVerifier.SignedRAV memory) {
         // Create a RAV
-        TAPVerifier.ReceiptAggregationVoucher memory rav =
-            TAPVerifier.ReceiptAggregationVoucher(allocationID, timestampNs, aggregateAmount);
+        TAPVerifier.ReceiptAggregateVoucher memory rav =
+            TAPVerifier.ReceiptAggregateVoucher(allocationID, timestampNs, aggregateAmount);
         bytes32 digest = tap_verifier.hashRAV(rav);
 
         // Sign the digest using the authorized signer's private key
