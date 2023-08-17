@@ -259,9 +259,7 @@ contract Escrow {
             ? account.balance
             : account.amountThawing;
 
-        unchecked {
-            account.balance -= amount; // Reduce the balance by the withdrawn amount (no underflow risk)
-        }
+        account.balance -= amount; // Reduce the balance by the withdrawn amount (no underflow risk)
         account.amountThawing = 0;
         account.thawEndTimestamp = 0;
         escrowToken.safeTransfer(msg.sender, amount);
@@ -383,9 +381,7 @@ contract Escrow {
             ? escrowAccounts[sender][receiver].balance
             : signedRAV.rav.valueAggregate;
 
-        unchecked {
-            escrowAccounts[sender][receiver].balance -= amount;
-        }
+        escrowAccounts[sender][receiver].balance -= amount;
 
         allocationIDTracker.useAllocationID(
             sender,
