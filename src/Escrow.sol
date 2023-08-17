@@ -92,6 +92,9 @@ contract Escrow {
     // Custom error to indicate invalid RAV signer
     error InvalidRAVSigner();
 
+    // Custom error to indicate the signer is not currently authorized by any sender
+    error SignerNotAuthorized();
+
     /**
      * @dev Emitted when escrow is deposited for a receiver.
      */
@@ -425,7 +428,11 @@ contract Escrow {
         address signer,
         address receiver
     ) external view returns (EscrowAccount memory) {
-        return escrowAccounts[authorizedSigners[signer].sender][receiver];
+        address sender = authorizedSigners[signer].sender;
+        if (sender == address(0)) {
+            revert SignerNotAuthorized();
+        }
+        return escrowAccounts[sender][receiver];
     }
 
     /**
