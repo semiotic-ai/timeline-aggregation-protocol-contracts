@@ -141,6 +141,15 @@ contract Escrow {
     );
 
     /**
+     * @dev Emitted when a the thawing of a signer is cancelled
+     */
+    event CancelThawSigner(
+        address indexed sender,
+        address indexed authorizedSigner,
+        uint256 thawEndTimestamp
+    );
+
+    /**
      * @dev Emitted when a authorized signer has been revoked
      */
     event RevokeAuthorizedSigner(
@@ -319,6 +328,31 @@ contract Escrow {
             block.timestamp +
             revokeSignerThawingPeriod;
         emit ThawSigner(
+            authorization.sender,
+            signer,
+            authorization.thawEndTimestamp
+        );
+    }
+
+    /**
+     * @dev stops thawing a signer.
+     * @param signer Address of the signer to stop thawing.
+     * @notice REVERT with error:
+     *               - SignerNotAuthorizedBySender: The provided signer is either not authorized or
+     *                 authorized by a different sender
+     */
+    function cancelThawSigner(address signer) external {
+        SenderAuthorization storage authorization = authorizedSigners[signer];
+
+        if (authorization.sender != msg.sender) {
+            revert SignerNotAuthorizedBySender(
+                signer,
+                authorizedSigners[signer].sender
+            );
+        }
+
+        authorization.thawEndTimestamp = 0;
+        emit CancelThawSigner(
             authorization.sender,
             signer,
             authorization.thawEndTimestamp
