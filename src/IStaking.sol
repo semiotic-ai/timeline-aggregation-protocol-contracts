@@ -4,7 +4,7 @@ pragma solidity ^0.8.18;
 
 /**
  * @title IStaking
- * @dev This interface is intended to mock the neccessary functions of the `Staking` contract while using a
+ * @dev This interface is intended to mock the necessary functions of the `Staking` contract while using a
  *      version of solidity consistent with the project.
  * @notice When deploying this interface should be attached to the `Staking` contract.
  */

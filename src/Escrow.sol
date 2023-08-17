@@ -35,7 +35,7 @@ contract Escrow {
     }
 
     // Stores how much escrow each sender has deposited for each receiver, as well as thawing information
-    mapping(address sender => mapping(address reciever => EscrowAccount escrowAccount))
+    mapping(address sender => mapping(address receiver => EscrowAccount escrowAccount))
         public escrowAccounts;
     // Map of signer to authorized signer information
     mapping(address signer => SenderAuthorization authorizedSigner)
