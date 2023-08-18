@@ -106,9 +106,27 @@ contract EscrowContractTest is Test {
         // Simulate passing the freeze period
         vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
 
+        // Cancel thaw and attempt to withdraw (expect revert)
+        vm.startPrank(SENDER_ADDRESS);
+        escrowContract.thaw(receiverAddress, 0);
+
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+        vm.expectRevert(Escrow.EscrowNotThawing.selector);
         escrowContract.withdraw(receiverAddress);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+
+        assertEq(senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw, 0, "Incorrect removed amount");
+
+        // Sets msg.sender address for next contract calls until stop is called
+        vm.startPrank(SENDER_ADDRESS);
+        escrowContract.thaw(receiverAddress, ESCROW_AMOUNT);
+
+        // Simulate passing the freeze period
+        vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
+
+        senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+        escrowContract.withdraw(receiverAddress);
+        senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
 
@@ -217,6 +235,7 @@ contract EscrowContractTest is Test {
 
             // Simulate passing partial freeze period
             vm.warp(block.timestamp + partialFreezePeriod);
+            partialEscrowAmount += ESCROW_AMOUNT / 10;
         }
 
         // expected to revert because not enough time has passed since the last thaw request
@@ -351,6 +370,22 @@ contract EscrowContractTest is Test {
             signed_rav
         );
 
+        // Cancel thaw and attempt to revoke signer (expect revert)
+        vm.prank(SENDER_ADDRESS);
+        escrowContract.cancelThawSigner(authorizedsigners[0]);
+
+        vm.prank(SENDER_ADDRESS);
+        vm.expectRevert(Escrow.SignerNotThawing.selector);
+        escrowContract.revokeAuthorizedSigner(authorizedsigners[0]);
+
+        // Restart thaw and revoke signer
+        vm.prank(SENDER_ADDRESS);
+        escrowContract.thawSigner(authorizedsigners[0]);
+
+        // Simulate passing the freeze period
+        vm.warp(block.timestamp + REVOKE_SIGNER_FREEZE_PERIOD + 1);
+
+
         vm.prank(SENDER_ADDRESS);
         escrowContract.revokeAuthorizedSigner(authorizedsigners[0]);
 
@@ -358,7 +393,7 @@ contract EscrowContractTest is Test {
 
         // Create a rav signed by revoked signer
         signed_rav =
-            createSignedRAV(receiversAllocationIDs[1], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[1]);
+            createSignedRAV(receiversAllocationIDs[1], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
 
         vm.expectRevert(Escrow.InvalidRAVSigner.selector);
         redeemSignedRAV(

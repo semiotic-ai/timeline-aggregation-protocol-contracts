@@ -132,9 +132,26 @@ contract Escrow {
     );
 
     /**
+     * @dev Emitted when a thaw request is cancelled for escrow.
+     */
+    event CancelThaw(
+        address indexed sender,
+        address indexed receiver
+    );
+
+    /**
      * @dev Emitted when a thaw request is made for authorized signer
      */
     event ThawSigner(
+        address indexed sender,
+        address indexed authorizedSigner,
+        uint256 thawEndTimestamp
+    );
+
+    /**
+     * @dev Emitted when the thawing of a signer is cancelled
+     */
+    event CancelThawSigner(
         address indexed sender,
         address indexed authorizedSigner,
         uint256 thawEndTimestamp
@@ -201,31 +218,44 @@ contract Escrow {
 
     /**
      * @dev Requests to thaw a specific amount of escrow from a receiver's escrow account.
+     *      if requested amount is zero any thawing in progress will be cancelled. If requested
+     *      amount is greater than zero any thawing in progress will be cancelled and a new
+     *     thawing request will be initiated.
      * @param receiver Address of the receiver the escrow account is for.
      * @param amount Amount of escrow to thaw.
      * @notice REVERT with error:
+     *               - InsufficientThawAmount: if the requested amount is zero and there is no
+     *                 escrow currently thawing
      *               - InsufficientEscrow: if the sender receiver escrow account does
      *                 not have enough escrow (greater than `amount`)
      */
     function thaw(address receiver, uint256 amount) external {
-        if(amount <= 0) {
-            revert InsufficientThawAmount();
-        }
         EscrowAccount storage account = escrowAccounts[msg.sender][
             receiver
         ];
-        uint256 totalThawingRequested = account.amountThawing + amount;
+        if(amount == 0) {
+            // if amount thawing is zero and requested amount is zero this is an invalid request(#36).
+            // otherwise if amount thawing is greater than zero and requested amount is zero this
+            // is a cancel thaw request.
+            if (account.amountThawing == 0){
+                revert InsufficientThawAmount();
+            }
+            account.amountThawing = 0;
+            account.thawEndTimestamp = 0;
+            emit CancelThaw(msg.sender, receiver);
+            return;
+        }
 
         // Check if the escrow balance is sufficient
-        if (account.balance < totalThawingRequested) {
+        if (account.balance < amount) {
             revert InsufficientEscrow({
                 available: account.balance,
-                required: totalThawingRequested
+                required: amount
             });
         }
 
-        // Increase the amount being thawed
-        account.amountThawing = totalThawingRequested;
+        // Set amount to thaw
+        account.amountThawing = amount;
         // Set when the thaw is complete (thawing period number of seconds after current timestamp)
         account.thawEndTimestamp =
             block.timestamp +
@@ -319,6 +349,31 @@ contract Escrow {
             block.timestamp +
             revokeSignerThawingPeriod;
         emit ThawSigner(
+            authorization.sender,
+            signer,
+            authorization.thawEndTimestamp
+        );
+    }
+
+    /**
+     * @dev stops thawing a signer.
+     * @param signer Address of the signer to stop thawing.
+     * @notice REVERT with error:
+     *               - SignerNotAuthorizedBySender: The provided signer is either not authorized or
+     *                 authorized by a different sender
+     */
+    function cancelThawSigner(address signer) external {
+        SenderAuthorization storage authorization = authorizedSigners[signer];
+
+        if (authorization.sender != msg.sender) {
+            revert SignerNotAuthorizedBySender(
+                signer,
+                authorizedSigners[signer].sender
+            );
+        }
+
+        authorization.thawEndTimestamp = 0;
+        emit CancelThawSigner(
             authorization.sender,
             signer,
             authorization.thawEndTimestamp
