@@ -407,19 +407,20 @@ contract EscrowContractTest is Test {
     }
 
     function authorizeSignerWithProof(address sender, uint256 signerPivateKey, address signer) private {
-        bytes memory authSignerAuthorizesSenderProof = createAuthorizedSignerProof(sender, signerPivateKey);
+        uint256 proofDeadline = block.timestamp + 86400;
+        bytes memory authSignerAuthorizesSenderProof = createAuthorizedSignerProof(proofDeadline, sender, signerPivateKey);
 
         // Authorize the signer
         vm.prank(sender);
-        escrowContract.authorizeSigner(signer, authSignerAuthorizesSenderProof);
+        escrowContract.authorizeSigner(signer, proofDeadline, authSignerAuthorizesSenderProof);
     }
 
-    function createAuthorizedSignerProof(address sender, uint256 signerPrivateKey)
+    function createAuthorizedSignerProof(uint256 proofDeadline, address sender, uint256 signerPrivateKey)
         private
-        pure
+        view
         returns (bytes memory)
     {
-        bytes32 messageHash = keccak256(abi.encodePacked(sender));
+        bytes32 messageHash = keccak256(abi.encodePacked(block.chainid, proofDeadline, sender));
         bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPrivateKey, allocationIDdigest);
         return abi.encodePacked(r, s, v);
@@ -430,8 +431,8 @@ contract EscrowContractTest is Test {
         address sender,
         address escrowContractAddress,
         uint256 allocationIDPrivateKey
-    ) private pure returns (bytes memory) {
-        bytes32 messageHash = keccak256(abi.encodePacked(sender, allocationID, escrowContractAddress));
+    ) private view returns (bytes memory) {
+        bytes32 messageHash = keccak256(abi.encodePacked(block.chainid, sender, allocationID, escrowContractAddress));
         bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(allocationIDPrivateKey, allocationIDdigest);
         return abi.encodePacked(r, s, v);
