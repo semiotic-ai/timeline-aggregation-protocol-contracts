@@ -106,9 +106,27 @@ contract EscrowContractTest is Test {
         // Simulate passing the freeze period
         vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
 
+        // Cancel thaw and attempt to withdraw (expect revert)
+        vm.startPrank(SENDER_ADDRESS);
+        escrowContract.thaw(receiverAddress, 0);
+
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+        vm.expectRevert(Escrow.EscrowNotThawing.selector);
         escrowContract.withdraw(receiverAddress);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+
+        assertEq(senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw, 0, "Incorrect removed amount");
+
+        // Sets msg.sender address for next contract calls until stop is called
+        vm.startPrank(SENDER_ADDRESS);
+        escrowContract.thaw(receiverAddress, ESCROW_AMOUNT);
+
+        // Simulate passing the freeze period
+        vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
+
+        senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+        escrowContract.withdraw(receiverAddress);
+        senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
 
@@ -217,6 +235,7 @@ contract EscrowContractTest is Test {
 
             // Simulate passing partial freeze period
             vm.warp(block.timestamp + partialFreezePeriod);
+            partialEscrowAmount += ESCROW_AMOUNT / 10;
         }
 
         // expected to revert because not enough time has passed since the last thaw request
@@ -351,7 +370,7 @@ contract EscrowContractTest is Test {
             signed_rav
         );
 
-        // Cancel freeze and attempt to revoke signer (expect revert)
+        // Cancel thaw and attempt to revoke signer (expect revert)
         vm.prank(SENDER_ADDRESS);
         escrowContract.cancelThawSigner(authorizedsigners[0]);
 
