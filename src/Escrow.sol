@@ -436,7 +436,9 @@ contract Escrow {
         }
 
         address sender = authorizedSigners[signer].sender;
-        address receiver = msg.sender;
+        address receiver = staking.getAllocation(
+            signedRAV.rav.allocationId
+        ).indexer;
         address allocationId = signedRAV.rav.allocationId;
 
         // Amount is the minimum between the amount owed on rav and the actual balance

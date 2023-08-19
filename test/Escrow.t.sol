@@ -73,6 +73,9 @@ contract EscrowContractTest is Test {
         receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiverMnemonic, 1));
         receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[0]));
 
+        // Call mock staking contract to register the allocationID to the receiver address
+        staking.allocate(receiversAllocationIDs[0], receiverAddress);
+
         receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiverMnemonic, 2));
         receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[1]));
 
