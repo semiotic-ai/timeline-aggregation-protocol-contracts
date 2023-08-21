@@ -332,6 +332,10 @@ contract Escrow {
     /**
      * @dev Starts thawing a signer to be removed from the authorized signers list.
      * @param signer Address of the signer to remove.
+     * @notice WARNING: Thawing a signer alerts receivers that signatures from that signer will soon be deemed invalid.
+     * Receivers without existing signed receipts or RAVs from this signer should treat them as unauthorized.
+     * Those with existing signed documents from this signer should work towards settling their engagements.
+     * Once a signer is thawed, they should be viewed as revoked regardless of their revocation status.
      * @notice REVERT with error:
      *               - SignerNotAuthorizedBySender: The provided signer is either not authorized or
      *                 authorized by a different sender
