@@ -308,12 +308,13 @@ contract Escrow {
     /**
      * @dev Authorizes a signer to sign RAVs for the sender.
      * @param signer Address of the authorized signer.
-     * @param proof The proof provided by the signer to authorize the sender.
+     * @param proof The proof provided by the signer to authorize the sender, consisting of packed (chainID, proof deadline, sender address).
+     * @dev The proof deadline is the timestamp at which the proof expires. The proof is susceptible to replay attacks until the deadline is reached.
      * @notice REVERT with error:
      *               - SignerAlreadyAuthorized: Signer is currently authorized for a sender
      *               - InvalidSignerProof: The provided signer proof is invalid
      */
-    function authorizeSigner(address signer, bytes calldata proof) external {
+    function authorizeSigner(address signer, uint256 proofDeadline, bytes calldata proof) external {
         if (authorizedSigners[signer].sender != address(0)) {
             revert SignerAlreadyAuthorized(
                 signer,
@@ -321,7 +322,7 @@ contract Escrow {
             );
         }
 
-        verifyAuthorizedSignerProof(proof, signer);
+        verifyAuthorizedSignerProof(proof, proofDeadline, signer);
 
         authorizedSigners[signer].sender = msg.sender;
         authorizedSigners[signer].thawEndTimestamp = 0;
@@ -501,10 +502,16 @@ contract Escrow {
      */
     function verifyAuthorizedSignerProof(
         bytes calldata proof,
+        uint256 proofDeadline,
         address signer
     ) private view {
+        // Verify that the proof deadline has not passed
+        if(block.timestamp > proofDeadline) {
+            revert InvalidSignerProof();
+        }
+
         // Generate the hash of the sender's address
-        bytes32 messageHash = keccak256(abi.encodePacked(msg.sender));
+        bytes32 messageHash = keccak256(abi.encodePacked(block.chainid, proofDeadline, msg.sender));
 
         // Generate the digest to be signed by the signer
         bytes32 digest = ECDSA.toEthSignedMessageHash(messageHash);

@@ -47,7 +47,7 @@ contract AllocationIDTracker {
      * @dev Marks an allocation ID as used.
      * @param sender The sender of the token to receiver.
      * @param allocationID The allocation ID to mark as used.
-     * @param proof ECDSA Proof signed by the receiver's allocationID consisting of packed (sender address, allocationID, escrow contract address).
+     * @param proof ECDSA Proof signed by the receiver's allocationID consisting of packed (chainID, sender address, allocationID, escrow contract address).
      * @notice REVERT with error:
      *               - AllocationIDPreviouslyClaimed: If the (sender, allocationID) pair was previously claimed
      *               - InvalidProof: If the proof is not valid
@@ -67,8 +67,8 @@ contract AllocationIDTracker {
     }
 
     /**
-     * @dev Verifies a proof.
-     * @param proof ECDSA Proof signed by the receiver's allocationID consisting of packed (sender address, allocationID, escrow contract address).
+     * @dev Verifies a proof of allocationID ownership.
+     * @param proof ECDSA Proof signed by the receiver's allocationID consisting of packed (chainID, sender address, allocationID, escrow contract address).
      * @param sender The sender of the token to receiver.
      * @param allocationID The allocation ID to verify.
      * @notice REVERT with error:
@@ -80,7 +80,7 @@ contract AllocationIDTracker {
         address allocationID
     ) private view {
         bytes32 messageHash = keccak256(
-            abi.encodePacked(sender, allocationID, msg.sender)
+            abi.encodePacked(block.chainid, sender, allocationID, msg.sender)
         );
         bytes32 digest = ECDSA.toEthSignedMessageHash(messageHash);
         if (ECDSA.recover(digest, proof) != allocationID) {
