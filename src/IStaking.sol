@@ -9,5 +9,9 @@ pragma solidity 0.8.18;
  * @notice When deploying this interface should be attached to the `Staking` contract.
  */
 interface IStaking {
+    struct Allocation {
+        address indexer;
+    }
     function collect(uint256 _tokens, address _allocationID) external;
+    function getAllocation(address _allocationID) external view returns (Allocation memory);
 }

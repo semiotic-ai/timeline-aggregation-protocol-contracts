@@ -11,8 +11,14 @@ contract MockStaking is IStaking {
 
     IERC20 private token;
 
+    mapping (address => Allocation) private allocations;
+
     constructor(address _token) {
         token = IERC20(_token);
+    }
+
+    function allocate(address _allocationID, address _indexer) external {
+        allocations[_allocationID] = Allocation(_indexer);
     }
 
     function collect(uint256 _tokens, address _allocationID) external override {
@@ -29,5 +35,14 @@ contract MockStaking is IStaking {
             // Remainder of staking collect not mocked since it only affects internal state of contract
             // ...
         }
+    }
+
+    function getAllocation(address _allocationID)
+        external
+        view
+        override
+        returns (Allocation memory)
+    {
+        return allocations[_allocationID];
     }
 }
