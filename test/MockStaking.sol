@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.18;
+pragma solidity 0.8.18;
 
 import {IStaking} from "../src/IStaking.sol";
 import {MockERC20Token} from "./MockERC20Token.sol";
