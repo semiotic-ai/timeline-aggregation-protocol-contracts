@@ -19,6 +19,10 @@ import {IStaking} from "./IStaking.sol";
  *      claim escrow.
  * @notice This contract uses the `TAPVerifier` contract for recovering signer addresses
  *         from `RAVs`.
+ * @notice CAUTIONARY NOTE: Upon observing a thaw event, indexers should act promptly. If the thaw concerns an authorized signer,
+ *         treat it as no longer valid for initiating new engagements. For ongoing engagements, efforts should be made to conclude
+ *         them swiftly. If funds are in a thawing state, anticipate an imminent withdrawal. Even if actions post-thaw are postponed,
+ *         it's prudent to act as though they've already taken place to sidestep potential pitfalls.
  */
 contract Escrow {
     using SafeERC20 for IERC20;
@@ -223,6 +227,10 @@ contract Escrow {
      *     thawing request will be initiated.
      * @param receiver Address of the receiver the escrow account is for.
      * @param amount Amount of escrow to thaw.
+    * @notice WARNING: Requesting to thaw escrow funds serves as an indication that these funds are soon to be withdrawn.
+    * Receivers with commitments linked to the thawing funds should quickly wrap up those commitments.
+    * At the same time, receivers should avoid starting new engagements tied to the thawing funds.
+    * After the thawing process, the funds should be viewed as withdrawn, irrespective of the actual withdrawal status.
      * @notice REVERT with error:
      *               - InsufficientThawAmount: if the requested amount is zero and there is no
      *                 escrow currently thawing
@@ -424,6 +432,11 @@ contract Escrow {
      * @dev Redeems escrow (up to amount available in escrow) for a receiver using a signed RAV.
      * @param signedRAV Signed RAV containing the receiver and escrow amount.
      * @param allocationIDProof Proof of allocationID ownership.
+     * @notice If a signer or funds are in the thawing process, exercise caution. Thawing indicates upcoming removals.
+     *         For in-depth understanding, refer to the respective documentation sections on thawing signers and funds.
+     * @notice will accept redeem even if escrow account balance is below RAV valueAggregate. Check escrow balance before
+     *         redeeming to ensure expected funds are available. Only one succesfully redeem is allowed for
+     *         (sender, allocationID) pair.
      * @notice REVERT: This function may revert if ECDSA.recover fails, check Open Zeppelin ECDSA library for details.
      * @notice REVERT with error:
      *               - InvalidRAVSigner: If the RAV is signed by a signer who is not authorized by any sender
