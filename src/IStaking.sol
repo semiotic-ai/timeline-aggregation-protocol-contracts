@@ -11,7 +11,20 @@ pragma solidity 0.8.18;
 interface IStaking {
     struct Allocation {
         address indexer;
+        bytes32 _subgraphDeploymentID;
+        uint256 _tokens;
+        address _allocationID;
+        bytes32 _metadata;
     }
     function collect(uint256 _tokens, address _allocationID) external;
     function getAllocation(address _allocationID) external view returns (Allocation memory);
+    function allocate(
+        bytes32 _subgraphDeploymentID,
+        uint256 _tokens,
+        address _allocationID,
+        bytes32 _metadata,
+        bytes calldata _proof
+    ) external;
+    function stake(uint256 _tokens) external;
+    function setAssetHolder(address _assetHolder, bool _allowed) external;
 }
