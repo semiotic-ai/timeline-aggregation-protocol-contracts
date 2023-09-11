@@ -46,21 +46,14 @@ parse_args() {
 }
 
 start_node_background() {
-    if ! npx hardhat --version &>/dev/null; then
-        echo "Error: hardhat is not installed."
-        read -p "Would you like to install it now? (y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            npm install --save-dev hardhat
-        else
-            exit 1
-        fi
-    fi
-    echo "starting hardhat node..."
-    npx hardhat node &
-    local hardhat_pid=$!
-    echo "hardhat node running (PID: $hardhat_pid)"
-    trap "kill $hardhat_pid 2>/dev/null" EXIT INT TERM ERR
+    anvil --chain-id '1337' \
+          --mnemonic 'myth like bonus scare over problem client lizard pioneer submit female collect' \
+          --host '0.0.0.0' \
+          --silent \
+          &
+    local anvil_pid=$!
+    echo "anvil node running (PID: $anvil_pid)"
+    trap "kill $anvil_pid 2>/dev/null" EXIT INT TERM ERR
 }
 
 deploy_graph_contracts() {
