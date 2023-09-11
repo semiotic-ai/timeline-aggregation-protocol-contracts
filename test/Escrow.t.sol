@@ -30,6 +30,20 @@ contract EscrowContractTest is Test {
     address[] internal receiversAllocationIDs;
 
     function setUp() public {
+        deployContracts();
+
+        // Approve staking contract to transfer tokens from the escrow contract
+        escrowContract.approveAll();
+
+        // give sender tokens
+        assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
+
+        generateKeys();
+
+        defineDebugLabels();
+    }
+
+    function deployContracts() public {
         // Create an instance of the TAPVerifier contract
         tap_verifier = new TAPVerifier("TAP", "1.0.0");
 
@@ -42,15 +56,11 @@ contract EscrowContractTest is Test {
         // set up allocation ID tracker
         AllocationIDTracker allocationIDTracker = new AllocationIDTracker();
 
-        // give sender tokens
-        assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
-
         escrowContract =
         new Escrow(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), WITHDRAW_ESCROW_FREEZE_PERIOD, REVOKE_SIGNER_FREEZE_PERIOD);
+    }
 
-        // Approve staking contract to transfer tokens from the escrow contract
-        escrowContract.approveAll();
-
+    function generateKeys() public {
         // Set up the signer to be authorized for signing rav's
         string memory signerMnemonic =
             "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
@@ -78,7 +88,9 @@ contract EscrowContractTest is Test {
 
         receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiverMnemonic, 2));
         receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[1]));
+    }
 
+    function defineDebugLabels() public {
         // label all known addresses for debugging
         vm.label(SENDER_ADDRESS, "SENDER_ADDRESS");
         vm.label(receiverAddress, "receiver");
