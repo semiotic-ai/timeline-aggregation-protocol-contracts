@@ -1,4 +1,6 @@
 #!/bin/bash
+# Copyright 2023-, Semiotic AI, Inc.
+# SPDX-License-Identifier: Apache-2.0
 
 # Add nvm to sources to use during script
 source ~/.nvm/nvm.sh

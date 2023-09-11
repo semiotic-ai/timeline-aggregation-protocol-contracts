@@ -1,3 +1,5 @@
+// Copyright 2023 -, Semiotic AI, Inc.
+// SPDX - License - Identifier: Apache - 2.0
 const DEFAULT_TEST_MNEMONIC =
   'myth like bonus scare over problem client lizard pioneer submit female collect'
 /** @type import('hardhat/config').HardhatUserConfig */
