@@ -1,3 +1,11 @@
 forge-std/=lib/forge-std/src/
 solmate/=lib/solmate/src/
 @openzeppelin/=lib/openzeppelin-contracts/
+@ensdomains/=lib/contracts/node_modules/@ensdomains/
+arbos-precompiles/=lib/contracts/
+ds-test/=lib/forge-std/lib/ds-test/src/
+erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/
+eth-gas-reporter/=lib/contracts/node_modules/eth-gas-reporter/
+hardhat/=lib/contracts/node_modules/hardhat/
+openzeppelin-contracts/=lib/openzeppelin-contracts/
+openzeppelin/=lib/openzeppelin-contracts/contracts/
