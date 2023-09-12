@@ -80,17 +80,17 @@ deploy_tap_contracts() {
     export ALLOCATION_TRACKER_ADDRESS=$(forge create \
         --unlocked --from $DEPLOYER \
         --rpc-url localhost:8545 src/AllocationIDTracker.sol:AllocationIDTracker --json \
-        | jq -r '.deployedTo')
+        | jq -Rr 'fromjson? | .deployedTo')
     export TAP_VERIFIER_ADDRESS=$(forge create \
         --unlocked --from $DEPLOYER \
         --rpc-url localhost:8545 src/TAPVerifier.sol:TAPVerifier \
         --constructor-args 'tapVerifier' '1.0' --json \
-        | jq -r '.deployedTo')
+        | jq -Rr 'fromjson? | .deployedTo')
     export ESCROW_ADDRESS=$(forge create \
         --unlocked --from $DEPLOYER \
         --rpc-url localhost:8545 src/Escrow.sol:Escrow \
         --constructor-args $GRAPH_NODE_ADDRESS $STAKING_ADDRESS $TAP_VERIFIER_ADDRESS $ALLOCATION_TRACKER_ADDRESS $WITHDRAW_ESCROW_FREEZE_PERIOD $REVOKE_SIGNER_FREEZE_PERIOD --json \
-        | jq -r '.deployedTo')
+        | jq -Rr 'fromjson? | .deployedTo')
     echo "TAP contracts deployed"
     cd -
 }
