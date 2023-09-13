@@ -90,6 +90,7 @@ contract EscrowContractTest is Test {
         vm.label(address(tap_verifier), "tap_verifier");
     }
 
+    // test plan tags: 2-1
     function testDepositFunds() public {
         depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
 
@@ -99,6 +100,7 @@ contract EscrowContractTest is Test {
         assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
     }
 
+    // test plan tags: 2-3, 2-4, 2-6
     function testWithdrawFundsAfterFreezePeriod() public {
         depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
 
@@ -141,6 +143,164 @@ contract EscrowContractTest is Test {
         vm.stopPrank();
     }
 
+    // test plan tags: 2-3, 2-5, 2-6, 2-7
+    function testThawReduce() public {
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+
+        // Sets msg.sender address for next contract calls until stop is called
+        vm.startPrank(SENDER_ADDRESS);
+        escrowContract.thaw(receiverAddress, ESCROW_AMOUNT);
+
+        // Simulate passing the freeze period
+        vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
+
+        // Cancel thaw and attempt to withdraw (expect revert)
+        vm.startPrank(SENDER_ADDRESS);
+        escrowContract.thaw(receiverAddress, ESCROW_AMOUNT/2);
+        uint256 expectedThawEnd = block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD;
+
+        uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+        vm.expectRevert(abi.encodeWithSignature("EscrowStillThawing(uint256,uint256)", block.timestamp, expectedThawEnd));
+        escrowContract.withdraw(receiverAddress);
+        uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+
+        assertEq(senderBalanceBeforeWithdraw - senderBalanceAfterWithdraw, 0, "Incorrect removed amount");
+
+        // Simulate passing the freeze period
+        vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
+
+        senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+        escrowContract.withdraw(receiverAddress);
+        senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+
+        uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
+
+        assertEq(removedAmount, ESCROW_AMOUNT/2, "Incorrect removed amount");
+
+        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        assertEq(remainingAmount, ESCROW_AMOUNT/2, "Incorrect remaining amount");
+        // Stop setting msg.sender address for any remaining contract calls
+        vm.stopPrank();
+    }
+
+    // test plan tags: 2-3, 2-6, 2-8
+    function testMultipleThawRequests() public {
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        uint256 partialEscrowAmount = ESCROW_AMOUNT / 10;
+        uint256 partialFreezePeriod = WITHDRAW_ESCROW_FREEZE_PERIOD / 10;
+        uint256 expectedThawEnd = 0;
+
+        // Sets msg.sender address for next contract calls until stop is called
+        vm.startPrank(SENDER_ADDRESS);
+
+        for (uint256 i = 0; i < 10; i++) {
+            // Sets msg.sender address for next contract calls until stop is called
+            escrowContract.thaw(receiverAddress, partialEscrowAmount);
+            expectedThawEnd = block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD;
+
+            // Simulate passing partial freeze period
+            vm.warp(block.timestamp + partialFreezePeriod);
+            partialEscrowAmount += ESCROW_AMOUNT / 10;
+        }
+
+        // expected to revert because not enough time has passed since the last thaw request
+        vm.expectRevert(abi.encodeWithSignature("EscrowStillThawing(uint256,uint256)", block.timestamp, expectedThawEnd));
+        escrowContract.withdraw(receiverAddress);
+
+        vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD);
+        uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+        escrowContract.withdraw(receiverAddress);
+        uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
+
+        uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
+
+        assertEq(removedAmount, ESCROW_AMOUNT, "Incorrect removed amount");
+
+        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        assertEq(remainingAmount, 0, "Incorrect remaining amount");
+        // Stop setting msg.sender address for any remaining contract calls
+        vm.stopPrank();
+    }
+
+    // test plan tags: 3-1, 3-5, 3-6, 4-4
+    function testRevokeAuthorizedSigner() public {
+        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+        vm.prank(SENDER_ADDRESS);
+        escrowContract.thawSigner(authorizedsigners[0]);
+
+        // Simulate passing the freeze period
+        vm.warp(block.timestamp + REVOKE_SIGNER_FREEZE_PERIOD + 1);
+
+        // Create a rav signed by signer that is thawed for revocation
+        uint128 RAVAggregateAmount = 158;
+        uint64 timestampNs = 10;
+        TAPVerifier.SignedRAV memory signed_rav =
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+
+        // RAV's signed by authorized signer should still be valid until signer is revoked
+        redeemSignedRAV(
+            receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(escrowContract),
+            signed_rav
+        );
+
+        // Cancel thaw and attempt to revoke signer (expect revert)
+        vm.prank(SENDER_ADDRESS);
+        escrowContract.cancelThawSigner(authorizedsigners[0]);
+
+        vm.prank(SENDER_ADDRESS);
+        vm.expectRevert(Escrow.SignerNotThawing.selector);
+        escrowContract.revokeAuthorizedSigner(authorizedsigners[0]);
+
+        // Restart thaw and revoke signer
+        vm.prank(SENDER_ADDRESS);
+        escrowContract.thawSigner(authorizedsigners[0]);
+
+        // Simulate passing the freeze period
+        vm.warp(block.timestamp + REVOKE_SIGNER_FREEZE_PERIOD + 1);
+
+        vm.prank(SENDER_ADDRESS);
+        escrowContract.revokeAuthorizedSigner(authorizedsigners[0]);
+
+        // expect revert when trying to redeem rav signed by revoked signer
+
+        // Create a rav signed by revoked signer
+        signed_rav =
+            createSignedRAV(receiversAllocationIDs[1], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+
+        vm.expectRevert(Escrow.InvalidRAVSigner.selector);
+        redeemSignedRAV(
+            receiversAllocationIDs[1],
+            receiversAllocationIDPrivateKeys[1],
+            receiverAddress,
+            SENDER_ADDRESS,
+            address(escrowContract),
+            signed_rav
+        );
+    }
+
+    function testInvalidAuthorizeSignerProof() public {
+        // Uses the wrong signer private key to create the proof
+        vm.expectRevert(Escrow.InvalidSignerProof.selector);
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[1], authorizedsigners[0]);
+
+        // Uses random bits for proof
+        // create random bits for 65 byte proof
+        uint256 randomBits = 0xabcdef12345678900987654321fedcba1234567890abcdef1234567890abcdef;
+        uint8 v = 27;
+        bytes memory invalidProof = abi.encodePacked(randomBits, randomBits, v); //65 bytes
+        vm.prank(SENDER_ADDRESS);
+        // expect any revert since the proof is not valid (could be invalid signer or invalid ecdsa proof)
+        vm.expectRevert();
+        escrowContract.authorizeSigner(authorizedsigners[0], block.timestamp+8600, invalidProof);
+    }
+
+    // test plan tags: 3-1
     function testRedeemRAVSignedByAuthorizedSigner() public {
         depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
         uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
@@ -180,6 +340,7 @@ contract EscrowContractTest is Test {
         assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
     }
 
+    // test plan tags: 3-1, 4-1, 4-3
         function testRedeemRAVWithValueGreaterThanAvailableEscrow() public {
         depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
 
@@ -215,6 +376,7 @@ contract EscrowContractTest is Test {
         assertEq(stakingBalanceAfter, stakingBalance + ESCROW_AMOUNT, "Incorrect receiver balance after redeeming");
     }
 
+    // test plan tags:
     function testGetEscrowAmount() public {
         depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
 
@@ -222,46 +384,9 @@ contract EscrowContractTest is Test {
         assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
     }
 
-    function testMultipleThawRequests() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
-        uint256 partialEscrowAmount = ESCROW_AMOUNT / 10;
-        uint256 partialFreezePeriod = WITHDRAW_ESCROW_FREEZE_PERIOD / 10;
-        uint256 expectedThawEnd = 0;
-
-        // Sets msg.sender address for next contract calls until stop is called
-        vm.startPrank(SENDER_ADDRESS);
-
-        for (uint256 i = 0; i < 10; i++) {
-            // Sets msg.sender address for next contract calls until stop is called
-            escrowContract.thaw(receiverAddress, partialEscrowAmount);
-            expectedThawEnd = block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD;
-
-            // Simulate passing partial freeze period
-            vm.warp(block.timestamp + partialFreezePeriod);
-            partialEscrowAmount += ESCROW_AMOUNT / 10;
-        }
-
-        // expected to revert because not enough time has passed since the last thaw request
-        vm.expectRevert(abi.encodeWithSignature("EscrowStillThawing(uint256,uint256)", block.timestamp, expectedThawEnd));
-        escrowContract.withdraw(receiverAddress);
-
-        vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD);
-        uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
-        escrowContract.withdraw(receiverAddress);
-        uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
-
-        uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
-
-        assertEq(removedAmount, ESCROW_AMOUNT, "Incorrect removed amount");
-
-        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
-        assertEq(remainingAmount, 0, "Incorrect remaining amount");
-        // Stop setting msg.sender address for any remaining contract calls
-        vm.stopPrank();
-    }
-
     // test that the contract reverts when allocation ID is used more than once
-    function testRevertOnDuplicateAllocationID() public {
+    // test plan tags: 3-1, 2-1, 4-1, 4-5
+    function testDuplicateAllocationID() public {
         depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
         uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
@@ -347,61 +472,27 @@ contract EscrowContractTest is Test {
         assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
     }
 
-    function testRevokeAuthorizedSigner() public {
+    function testRedeemRAVWithInvalidSignature() public {
         depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
-        vm.prank(SENDER_ADDRESS);
-        escrowContract.thawSigner(authorizedsigners[0]);
 
-        // Simulate passing the freeze period
-        vm.warp(block.timestamp + REVOKE_SIGNER_FREEZE_PERIOD + 1);
-
-        // Create a rav signed by signer that is thawed for revocation
-        uint128 RAVAggregateAmount = 158;
+        // Create a signed rav
+        uint128 RAVAggregateAmount = uint128(ESCROW_AMOUNT);
         uint64 timestampNs = 10;
         TAPVerifier.SignedRAV memory signed_rav =
             createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
 
-        // RAV's signed by authorized signer should still be valid until signer is revoked
+        // Alter signature to random bits
+        uint256 randomBits = 0xabcdef12345678900987654321fedcba1234567890abcdef1234567890abcdef;
+        uint8 v = 27;
+        signed_rav.signature = abi.encodePacked(randomBits, randomBits, v);
+
+        // Receiver redeems value from the SignedRAV, expected to revert
+        vm.expectRevert();
         redeemSignedRAV(
             receiversAllocationIDs[0],
             receiversAllocationIDPrivateKeys[0],
-            receiverAddress,
-            SENDER_ADDRESS,
-            address(escrowContract),
-            signed_rav
-        );
-
-        // Cancel thaw and attempt to revoke signer (expect revert)
-        vm.prank(SENDER_ADDRESS);
-        escrowContract.cancelThawSigner(authorizedsigners[0]);
-
-        vm.prank(SENDER_ADDRESS);
-        vm.expectRevert(Escrow.SignerNotThawing.selector);
-        escrowContract.revokeAuthorizedSigner(authorizedsigners[0]);
-
-        // Restart thaw and revoke signer
-        vm.prank(SENDER_ADDRESS);
-        escrowContract.thawSigner(authorizedsigners[0]);
-
-        // Simulate passing the freeze period
-        vm.warp(block.timestamp + REVOKE_SIGNER_FREEZE_PERIOD + 1);
-
-
-        vm.prank(SENDER_ADDRESS);
-        escrowContract.revokeAuthorizedSigner(authorizedsigners[0]);
-
-        // expect revert when trying to redeem rav signed by revoked signer
-
-        // Create a rav signed by revoked signer
-        signed_rav =
-            createSignedRAV(receiversAllocationIDs[1], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
-
-        vm.expectRevert(Escrow.InvalidRAVSigner.selector);
-        redeemSignedRAV(
-            receiversAllocationIDs[1],
-            receiversAllocationIDPrivateKeys[1],
             receiverAddress,
             SENDER_ADDRESS,
             address(escrowContract),
