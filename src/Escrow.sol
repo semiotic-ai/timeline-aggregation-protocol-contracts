@@ -475,7 +475,7 @@ contract Escrow {
         staking.collect(amount, allocationId);
         emit Redeem(
             sender,
-            msg.sender,
+            receiver,
             signedRAV.rav.allocationId,
             signedRAV.rav.valueAggregate,
             amount
