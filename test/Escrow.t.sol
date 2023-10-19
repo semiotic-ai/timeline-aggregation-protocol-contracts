@@ -141,28 +141,6 @@ contract EscrowContractTest is Test {
         authorizedsigners.push(vm.addr(authorizedSignerPrivateKeys[1]));
 
         // Set up the receiver address and derive the allocation ID
-<<<<<<< HEAD
-        receiverPrivateKey = vm.deriveKey(mnemonic, 3);
-        receiverAddress = vm.addr(receiverPrivateKey);
-
-        // Set up the receiver2 address
-        string memory receiver2Mnemonic =
-            "traffic return wide refuse sustain dirt leader end deposit flash paddle snow grit fall like";
-        receiver2PrivateKey = vm.deriveKey(receiver2Mnemonic, 0);
-        receiver2Address = vm.addr(receiver2PrivateKey);
-
-        // Set up the receiver 3 address
-        string memory receiver3Mnemonic =
-            "diary lawsuit sign cause kiss distance segment minimum kit moment sponsor ensure plate shaft police";
-        receiver3PrivateKey = vm.deriveKey(receiver3Mnemonic, 0);
-        receiver3Address = vm.addr(receiver3PrivateKey);
-
-        // Derive the allocation IDs from the receiver Mneumonic
-        receiversAllocationIDPrivateKeys.push(vm.deriveKey(mnemonic, 4));
-        receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[0]));
-
-        receiversAllocationIDPrivateKeys.push(vm.deriveKey(mnemonic, 5));
-=======
         for (uint i = 0; i < receiversMnemonics.length; i++) {
             receiversPrivateKeys.push(vm.deriveKey(receiversMnemonics[i], 0));
             receiversAddresses.push(vm.addr(receiversPrivateKeys[i]));
@@ -171,11 +149,7 @@ contract EscrowContractTest is Test {
         receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiversMnemonics[0], 1));
         receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[0]));
 
-        // Call mock staking contract to register the allocationID to the receiver address
-        staking.allocate(receiversAllocationIDs[0], receiversAddresses[0]);
-
         receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiversMnemonics[0], 2));
->>>>>>> 4cecd6a (test: make receivers an adress array)
         receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[1]));
     }
 
@@ -193,7 +167,7 @@ contract EscrowContractTest is Test {
         vm.prank(tokenOwner);
         assert(mockERC20.transfer(SENDER_ADDRESS, INITIAL_SENDER_BALANCE));
         vm.prank(tokenOwner);
-        assert(mockERC20.transfer(receiverAddress, STAKE_AMOUNT));
+        assert(mockERC20.transfer(receiversAddresses[0], STAKE_AMOUNT));
     }
 
     function defineDebugLabels() public {
@@ -215,9 +189,9 @@ contract EscrowContractTest is Test {
 
     function createAllocation() public {
         // Stake tokens to create an allocation
-        vm.prank(receiverAddress);
+        vm.prank(receiversAddresses[0]);
         mockERC20.approve(address(staking), STAKE_AMOUNT);
-        vm.prank(receiverAddress);
+        vm.prank(receiversAddresses[0]);
         staking.stake(STAKE_AMOUNT);
         // Define arbitrary values for bytes32 and tokens
         bytes32 arbitraryBytes32 = bytes32(uint256(123));
@@ -225,12 +199,12 @@ contract EscrowContractTest is Test {
 
         bytes memory allocationIDProof = createAllocationIDProof(
             receiversAllocationIDs[0],
-            receiverAddress,
+            receiversAddresses[0],
             receiversAllocationIDPrivateKeys[0]
         );
 
         // Call mock staking contract to register the allocationID to the receiver address
-        vm.prank(receiverAddress);
+        vm.prank(receiversAddresses[0]);
         staking.allocate(
             arbitraryBytes32,
             tokens,
@@ -501,15 +475,9 @@ contract EscrowContractTest is Test {
 
     // test plan tags: 3-1
     function testRedeemRAVSignedByAuthorizedSigner() public {
-<<<<<<< HEAD
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
-        uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
-        assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect initial escrow");
-=======
         depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
         uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
         assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
->>>>>>> 4cecd6a (test: make receivers an adress array)
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
@@ -657,14 +625,9 @@ contract EscrowContractTest is Test {
 
         // create additional sender address to test that the contract does not revert when redeeming same allocation ID with a different sender
         address secondSenderAddress = address(0xa789);
-<<<<<<< HEAD
         vm.prank(deployerAddress);
         assert(mockERC20.transfer(secondSenderAddress, INITIAL_SENDER_BALANCE));
-        depositEscrow(secondSenderAddress, receiverAddress, ESCROW_AMOUNT);
-=======
-        assert(mockERC20.transfer(secondSenderAddress, 10000000));
         depositEscrow(secondSenderAddress, receiversAddresses[0], ESCROW_AMOUNT);
->>>>>>> 4cecd6a (test: make receivers an adress array)
 
         // should not revert when redeeming same allocationID with a different sender
         authorizeSignerWithProof(secondSenderAddress, authorizedSignerPrivateKeys[1], authorizedsigners[1]);
