@@ -6,7 +6,7 @@ import "forge-std/Test.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {TAPVerifier} from "../src/TAPVerifier.sol";
 import {Escrow} from "../src/Escrow.sol";
-import {MockERC20Token} from "../test/MockERC20Token.sol";
+import {MockERC20Token} from "./MockERC20Token.sol";
 import {AllocationIDTracker} from "../src/AllocationIDTracker.sol";
 import {MockStaking} from "./MockStaking.sol";
 import {VmSafe} from "forge-std/Vm.sol";
