@@ -6,10 +6,11 @@ import "forge-std/Test.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {TAPVerifier} from "../src/TAPVerifier.sol";
 import {Escrow} from "../src/Escrow.sol";
-import {MockERC20Token} from "./MockERC20Token.sol";
+import {MockERC20Token} from "../test/MockERC20Token.sol";
 import {AllocationIDTracker} from "../src/AllocationIDTracker.sol";
 import {MockStaking} from "./MockStaking.sol";
 import {VmSafe} from "forge-std/Vm.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 contract EscrowContractTest is Test {
     address private constant SENDER_ADDRESS = address(0x789);
@@ -33,14 +34,15 @@ contract EscrowContractTest is Test {
     uint256[] internal authorizedSignerPrivateKeys;
     address[] internal authorizedsigners;
 
-    uint256 internal receiverPrivateKey;
-    uint256 internal receiver2PrivateKey;
-    uint256 internal receiver3PrivateKey;
+    uint256[] internal receiversPrivateKeys;
     uint256[] internal receiversAllocationIDPrivateKeys;
-    address internal receiverAddress;
-    address internal receiver2Address;
-    address internal receiver3Address;
+    address[] internal receiversAddresses;
     address[] internal receiversAllocationIDs;
+    string[] internal receiversMnemonics = [
+        "betray tornado relax hold february impact rain run nut frown bag this gravity amused math",
+        "traffic return wide refuse sustain dirt leader end deposit flash paddle snow grit fall like",
+        "diary lawsuit sign cause kiss distance segment minimum kit moment sponsor ensure plate shaft police"
+    ];
 
     address internal deployerAddress;
     uint256 internal deployerPrivateKey;
@@ -139,6 +141,7 @@ contract EscrowContractTest is Test {
         authorizedsigners.push(vm.addr(authorizedSignerPrivateKeys[1]));
 
         // Set up the receiver address and derive the allocation ID
+<<<<<<< HEAD
         receiverPrivateKey = vm.deriveKey(mnemonic, 3);
         receiverAddress = vm.addr(receiverPrivateKey);
 
@@ -159,6 +162,20 @@ contract EscrowContractTest is Test {
         receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[0]));
 
         receiversAllocationIDPrivateKeys.push(vm.deriveKey(mnemonic, 5));
+=======
+        for (uint i = 0; i < receiversMnemonics.length; i++) {
+            receiversPrivateKeys.push(vm.deriveKey(receiversMnemonics[i], 0));
+            receiversAddresses.push(vm.addr(receiversPrivateKeys[i]));
+        }
+
+        receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiversMnemonics[0], 1));
+        receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[0]));
+
+        // Call mock staking contract to register the allocationID to the receiver address
+        staking.allocate(receiversAllocationIDs[0], receiversAddresses[0]);
+
+        receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiversMnemonics[0], 2));
+>>>>>>> 4cecd6a (test: make receivers an adress array)
         receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[1]));
     }
 
@@ -182,9 +199,9 @@ contract EscrowContractTest is Test {
     function defineDebugLabels() public {
         // label all known addresses for debugging
         vm.label(SENDER_ADDRESS, "SENDER_ADDRESS");
-        vm.label(receiverAddress, "receiver");
-        vm.label(receiver2Address, "receiver2");
-        vm.label(receiver3Address, "receiver3");
+        for (uint i = 0; i < receiversAddresses.length; i++) {
+            vm.label(receiversAddresses[i], string.concat("receiver", Strings.toString(i)));
+        }
         vm.label(receiversAllocationIDs[0], "receiversAllocationID");
         vm.label(authorizedsigners[0], "authorizedsigner_0");
         vm.label(authorizedsigners[1], "authorizedsigner_1");
@@ -243,20 +260,15 @@ contract EscrowContractTest is Test {
 
     // test plan tags: 2-1
     function testDepositFunds() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
 
         vm.prank(SENDER_ADDRESS);
-        uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
 
         assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
     }
 
     function testDepositManyFunds() public {
-        address[] memory receivers = new address[](3);
-        receivers[0] = receiverAddress;
-        receivers[1] = receiver2Address;
-        receivers[2] = receiver3Address;
-
         uint256[] memory amounts = new uint256[](3);
         amounts[0] = ESCROW_AMOUNT;
         amounts[1] = ESCROW_AMOUNT*10;
@@ -267,69 +279,64 @@ contract EscrowContractTest is Test {
            totalAmount += amounts[i]; 
         }
 
-        depositManyEscrow(SENDER_ADDRESS, receivers, amounts);
+        depositManyEscrow(SENDER_ADDRESS, receiversAddresses, amounts);
 
         vm.prank(SENDER_ADDRESS);
 
-        for (uint i = 0; i < receivers.length; i++) {
-            uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receivers[i]);
+        for (uint i = 0; i < receiversAddresses.length; i++) {
+            uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[i]);
             assertEq(depositedAmount, amounts[i], "Incorrect deposited amount");
         }
     }
 
     function testDepositManyFundsWithLengthMismatch() public {
-        address[] memory receivers = new address[](3);
-        receivers[0] = receiverAddress;
-        receivers[1] = receiver2Address;
-        receivers[2] = receiver3Address;
-
         uint256[] memory amounts = new uint256[](2);
         amounts[0] = ESCROW_AMOUNT;
         amounts[1] = ESCROW_AMOUNT;
 
         vm.prank(SENDER_ADDRESS);
         vm.expectRevert(Escrow.InputsLengthMismatch.selector);
-        escrowContract.depositMany(receivers, amounts);
+        escrowContract.depositMany(receiversAddresses, amounts);
     }
 
     // test plan tags: 2-3, 2-4, 2-6
     function testWithdrawFundsAfterFreezePeriod() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
 
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(SENDER_ADDRESS);
-        escrowContract.thaw(receiverAddress, ESCROW_AMOUNT);
+        escrowContract.thaw(receiversAddresses[0], ESCROW_AMOUNT);
 
         // Simulate passing the freeze period
         vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
 
         // Cancel thaw and attempt to withdraw (expect revert)
         vm.startPrank(SENDER_ADDRESS);
-        escrowContract.thaw(receiverAddress, 0);
+        escrowContract.thaw(receiversAddresses[0], 0);
 
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
         vm.expectRevert(Escrow.EscrowNotThawing.selector);
-        escrowContract.withdraw(receiverAddress);
+        escrowContract.withdraw(receiversAddresses[0]);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         assertEq(senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw, 0, "Incorrect removed amount");
 
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(SENDER_ADDRESS);
-        escrowContract.thaw(receiverAddress, ESCROW_AMOUNT);
+        escrowContract.thaw(receiversAddresses[0], ESCROW_AMOUNT);
 
         // Simulate passing the freeze period
         vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
 
         senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
-        escrowContract.withdraw(receiverAddress);
+        escrowContract.withdraw(receiversAddresses[0]);
         senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
 
         assertEq(removedAmount, ESCROW_AMOUNT, "Incorrect removed amount");
 
-        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
         assertEq(remainingAmount, 0, "Incorrect remaining amount");
         // Stop setting msg.sender address for any remaining contract calls
         vm.stopPrank();
@@ -337,23 +344,23 @@ contract EscrowContractTest is Test {
 
     // test plan tags: 2-3, 2-5, 2-6, 2-7
     function testThawReduce() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
 
         // Sets msg.sender address for next contract calls until stop is called
         vm.startPrank(SENDER_ADDRESS);
-        escrowContract.thaw(receiverAddress, ESCROW_AMOUNT);
+        escrowContract.thaw(receiversAddresses[0], ESCROW_AMOUNT);
 
         // Simulate passing the freeze period
         vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
 
         // Cancel thaw and attempt to withdraw (expect revert)
         vm.startPrank(SENDER_ADDRESS);
-        escrowContract.thaw(receiverAddress, ESCROW_AMOUNT/2);
+        escrowContract.thaw(receiversAddresses[0], ESCROW_AMOUNT/2);
         uint256 expectedThawEnd = block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD;
 
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
         vm.expectRevert(abi.encodeWithSignature("EscrowStillThawing(uint256,uint256)", block.timestamp, expectedThawEnd));
-        escrowContract.withdraw(receiverAddress);
+        escrowContract.withdraw(receiversAddresses[0]);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         assertEq(senderBalanceBeforeWithdraw - senderBalanceAfterWithdraw, 0, "Incorrect removed amount");
@@ -362,14 +369,14 @@ contract EscrowContractTest is Test {
         vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD + 1);
 
         senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
-        escrowContract.withdraw(receiverAddress);
+        escrowContract.withdraw(receiversAddresses[0]);
         senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
 
         assertEq(removedAmount, ESCROW_AMOUNT/2, "Incorrect removed amount");
 
-        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
         assertEq(remainingAmount, ESCROW_AMOUNT/2, "Incorrect remaining amount");
         // Stop setting msg.sender address for any remaining contract calls
         vm.stopPrank();
@@ -377,7 +384,7 @@ contract EscrowContractTest is Test {
 
     // test plan tags: 2-3, 2-6, 2-8
     function testMultipleThawRequests() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
         uint256 partialEscrowAmount = ESCROW_AMOUNT / 10;
         uint256 partialFreezePeriod = WITHDRAW_ESCROW_FREEZE_PERIOD / 10;
         uint256 expectedThawEnd = 0;
@@ -387,7 +394,7 @@ contract EscrowContractTest is Test {
 
         for (uint256 i = 0; i < 10; i++) {
             // Sets msg.sender address for next contract calls until stop is called
-            escrowContract.thaw(receiverAddress, partialEscrowAmount);
+            escrowContract.thaw(receiversAddresses[0], partialEscrowAmount);
             expectedThawEnd = block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD;
 
             // Simulate passing partial freeze period
@@ -397,18 +404,18 @@ contract EscrowContractTest is Test {
 
         // expected to revert because not enough time has passed since the last thaw request
         vm.expectRevert(abi.encodeWithSignature("EscrowStillThawing(uint256,uint256)", block.timestamp, expectedThawEnd));
-        escrowContract.withdraw(receiverAddress);
+        escrowContract.withdraw(receiversAddresses[0]);
 
         vm.warp(block.timestamp + WITHDRAW_ESCROW_FREEZE_PERIOD);
         uint256 senderBalanceBeforeWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
-        escrowContract.withdraw(receiverAddress);
+        escrowContract.withdraw(receiversAddresses[0]);
         uint256 senderBalanceAfterWithdraw = mockERC20.balanceOf(SENDER_ADDRESS);
 
         uint256 removedAmount = senderBalanceAfterWithdraw - senderBalanceBeforeWithdraw;
 
         assertEq(removedAmount, ESCROW_AMOUNT, "Incorrect removed amount");
 
-        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        uint256 remainingAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
         assertEq(remainingAmount, 0, "Incorrect remaining amount");
         // Stop setting msg.sender address for any remaining contract calls
         vm.stopPrank();
@@ -416,7 +423,7 @@ contract EscrowContractTest is Test {
 
     // test plan tags: 3-1, 3-5, 3-6, 4-4
     function testRevokeAuthorizedSigner() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
         vm.prank(SENDER_ADDRESS);
@@ -435,7 +442,7 @@ contract EscrowContractTest is Test {
         redeemSignedRAV(
             receiversAllocationIDs[0],
             receiversAllocationIDPrivateKeys[0],
-            receiverAddress,
+            receiversAddresses[0],
             SENDER_ADDRESS,
             address(escrowContract),
             signed_rav
@@ -469,7 +476,7 @@ contract EscrowContractTest is Test {
         redeemSignedRAV(
             receiversAllocationIDs[1],
             receiversAllocationIDPrivateKeys[1],
-            receiverAddress,
+            receiversAddresses[0],
             SENDER_ADDRESS,
             address(escrowContract),
             signed_rav
@@ -494,9 +501,15 @@ contract EscrowContractTest is Test {
 
     // test plan tags: 3-1
     function testRedeemRAVSignedByAuthorizedSigner() public {
+<<<<<<< HEAD
         depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
         uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
         assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect initial escrow");
+=======
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
+        uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
+        assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
+>>>>>>> 4cecd6a (test: make receivers an adress array)
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
@@ -513,7 +526,7 @@ contract EscrowContractTest is Test {
         redeemSignedRAV(
             receiversAllocationIDs[0],
             receiversAllocationIDPrivateKeys[0],
-            receiverAddress,
+            receiversAddresses[0],
             SENDER_ADDRESS,
             address(escrowContract),
             signed_rav
@@ -522,7 +535,7 @@ contract EscrowContractTest is Test {
         remainingEscrow -= RAVAggregateAmount;
 
         assertEq(
-            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress),
+            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]),
             remainingEscrow,
             "Incorrect remaining escrow"
         );
@@ -537,7 +550,7 @@ contract EscrowContractTest is Test {
 
     // test plan tags: 3-1, 4-1, 4-3
         function testRedeemRAVWithValueGreaterThanAvailableEscrow() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
@@ -554,14 +567,14 @@ contract EscrowContractTest is Test {
         redeemSignedRAV(
             receiversAllocationIDs[0],
             receiversAllocationIDPrivateKeys[0],
-            receiverAddress,
+            receiversAddresses[0],
             SENDER_ADDRESS,
             address(escrowContract),
             signed_rav
         );
 
         assertEq(
-            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress),
+            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]),
             uint128(0),
             "Incorrect remaining escrow"
         );
@@ -575,17 +588,17 @@ contract EscrowContractTest is Test {
 
     // test plan tags:
     function testGetEscrowAmount() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
 
-        uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
         assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
     }
 
     // test that the contract reverts when allocation ID is used more than once
     // test plan tags: 3-1, 2-1, 4-1, 4-5
     function testDuplicateAllocationID() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
-        uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
+        uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
         assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
@@ -603,7 +616,7 @@ contract EscrowContractTest is Test {
         redeemSignedRAV(
             receiversAllocationIDs[0],
             receiversAllocationIDPrivateKeys[0],
-            receiverAddress,
+            receiversAddresses[0],
             SENDER_ADDRESS,
             address(escrowContract),
             signed_rav
@@ -619,7 +632,7 @@ contract EscrowContractTest is Test {
         }
 
         assertEq(
-            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress),
+            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]),
             remainingEscrow,
             "Incorrect remaining amount"
         );
@@ -629,7 +642,7 @@ contract EscrowContractTest is Test {
         redeemSignedRAV(
             receiversAllocationIDs[0],
             receiversAllocationIDPrivateKeys[0],
-            receiverAddress,
+            receiversAddresses[0],
             SENDER_ADDRESS,
             address(escrowContract),
             signed_rav
@@ -637,16 +650,21 @@ contract EscrowContractTest is Test {
 
         // remaining escrow should not have changed
         assertEq(
-            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress),
+            escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]),
             remainingEscrow,
             "Incorrect remaining amount"
         );
 
         // create additional sender address to test that the contract does not revert when redeeming same allocation ID with a different sender
         address secondSenderAddress = address(0xa789);
+<<<<<<< HEAD
         vm.prank(deployerAddress);
         assert(mockERC20.transfer(secondSenderAddress, INITIAL_SENDER_BALANCE));
         depositEscrow(secondSenderAddress, receiverAddress, ESCROW_AMOUNT);
+=======
+        assert(mockERC20.transfer(secondSenderAddress, 10000000));
+        depositEscrow(secondSenderAddress, receiversAddresses[0], ESCROW_AMOUNT);
+>>>>>>> 4cecd6a (test: make receivers an adress array)
 
         // should not revert when redeeming same allocationID with a different sender
         authorizeSignerWithProof(secondSenderAddress, authorizedSignerPrivateKeys[1], authorizedsigners[1]);
@@ -662,7 +680,7 @@ contract EscrowContractTest is Test {
         redeemSignedRAV(
             receiversAllocationIDs[0],
             receiversAllocationIDPrivateKeys[0],
-            receiverAddress,
+            receiversAddresses[0],
             secondSenderAddress,
             address(escrowContract),
             second_signed_rav
@@ -677,7 +695,7 @@ contract EscrowContractTest is Test {
     }
 
     function testRedeemRAVWithInvalidSignature() public {
-        depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
@@ -697,7 +715,7 @@ contract EscrowContractTest is Test {
         redeemSignedRAV(
             receiversAllocationIDs[0],
             receiversAllocationIDPrivateKeys[0],
-            receiverAddress,
+            receiversAddresses[0],
             SENDER_ADDRESS,
             address(escrowContract),
             signed_rav
@@ -798,7 +816,7 @@ contract EscrowContractTest is Test {
     function redeemSignedRAV(
         address allocationID,
         uint256 allocationIDPrivateKey,
-        address receiverAddress_,
+        address receiverAddress,
         address senderAddress,
         address escrowContractAddress,
         TAPVerifier.SignedRAV memory signedRAV
@@ -807,7 +825,7 @@ contract EscrowContractTest is Test {
         bytes memory proof = createAllocationIDOwnershipProof(
             allocationID, senderAddress, address(escrowContractAddress), allocationIDPrivateKey
         );
-        vm.prank(receiverAddress_);
+        vm.prank(receiverAddress);
         escrowContract.redeem(signedRAV, proof);
     }
 }
