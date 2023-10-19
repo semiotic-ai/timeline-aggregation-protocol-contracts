@@ -102,6 +102,9 @@ contract Escrow {
     // Custom error to indicate the signer is not currently authorized by any sender
     error SignerNotAuthorized();
 
+    // Custom error to indicate inputs length mismatch
+    error InputsLengthMismatch();
+
     /**
      * @dev Emitted when escrow is deposited for a receiver.
      */
@@ -218,6 +221,32 @@ contract Escrow {
         escrowAccounts[msg.sender][receiver].balance += amount;
         escrowToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Deposit(msg.sender, receiver, amount);
+    }
+
+    /**
+     * @dev Deposits escrow for multiple receivers.
+     * @param receivers Array of addresses of the receivers. 
+     * @param amounts Array of amounts of escrow to deposit.
+     * @notice The escrow must be approved for transfer by the sender.
+     * @notice REVERT: this function will revert if the escrow transfer fails.
+     * @notice REVERT: if the length of the receivers and amounts arrays do not match.
+     */
+    function depositMany(address[] calldata receivers, uint256[] calldata amounts) external {
+        if (receivers.length != amounts.length) {
+            revert InputsLengthMismatch();
+        }
+
+        uint256 totalAmount = 0;
+        for (uint i = 0; i < receivers.length; i++) {
+            address receiver = receivers[i];
+            uint256 amount = amounts[i];
+
+            totalAmount += amount;
+            escrowAccounts[msg.sender][receiver].balance += amount;
+            emit Deposit(msg.sender, receiver, amount);
+        }
+
+        escrowToken.safeTransferFrom(msg.sender, address(this), totalAmount);
     }
 
     /**
