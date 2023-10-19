@@ -34,8 +34,12 @@ contract EscrowContractTest is Test {
     address[] internal authorizedsigners;
 
     uint256 internal receiverPrivateKey;
+    uint256 internal receiver2PrivateKey;
+    uint256 internal receiver3PrivateKey;
     uint256[] internal receiversAllocationIDPrivateKeys;
     address internal receiverAddress;
+    address internal receiver2Address;
+    address internal receiver3Address;
     address[] internal receiversAllocationIDs;
 
     address internal deployerAddress;
@@ -138,6 +142,18 @@ contract EscrowContractTest is Test {
         receiverPrivateKey = vm.deriveKey(mnemonic, 3);
         receiverAddress = vm.addr(receiverPrivateKey);
 
+        // Set up the receiver2 address
+        string memory receiver2Mnemonic =
+            "traffic return wide refuse sustain dirt leader end deposit flash paddle snow grit fall like";
+        receiver2PrivateKey = vm.deriveKey(receiver2Mnemonic, 0);
+        receiver2Address = vm.addr(receiver2PrivateKey);
+
+        // Set up the receiver 3 address
+        string memory receiver3Mnemonic =
+            "diary lawsuit sign cause kiss distance segment minimum kit moment sponsor ensure plate shaft police";
+        receiver3PrivateKey = vm.deriveKey(receiver3Mnemonic, 0);
+        receiver3Address = vm.addr(receiver3PrivateKey);
+
         // Derive the allocation IDs from the receiver Mneumonic
         receiversAllocationIDPrivateKeys.push(vm.deriveKey(mnemonic, 4));
         receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[0]));
@@ -167,6 +183,8 @@ contract EscrowContractTest is Test {
         // label all known addresses for debugging
         vm.label(SENDER_ADDRESS, "SENDER_ADDRESS");
         vm.label(receiverAddress, "receiver");
+        vm.label(receiver2Address, "receiver2");
+        vm.label(receiver3Address, "receiver3");
         vm.label(receiversAllocationIDs[0], "receiversAllocationID");
         vm.label(authorizedsigners[0], "authorizedsigner_0");
         vm.label(authorizedsigners[1], "authorizedsigner_1");
@@ -231,6 +249,47 @@ contract EscrowContractTest is Test {
         uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
 
         assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
+    }
+
+    function testDepositManyFunds() public {
+        address[] memory receivers = new address[](3);
+        receivers[0] = receiverAddress;
+        receivers[1] = receiver2Address;
+        receivers[2] = receiver3Address;
+
+        uint256[] memory amounts = new uint256[](3);
+        amounts[0] = ESCROW_AMOUNT;
+        amounts[1] = ESCROW_AMOUNT*10;
+        amounts[2] = ESCROW_AMOUNT*2;
+
+        uint256 totalAmount = 0;
+        for (uint i = 0; i < amounts.length; i++) {
+           totalAmount += amounts[i]; 
+        }
+
+        depositManyEscrow(SENDER_ADDRESS, receivers, amounts);
+
+        vm.prank(SENDER_ADDRESS);
+
+        for (uint i = 0; i < receivers.length; i++) {
+            uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receivers[i]);
+            assertEq(depositedAmount, amounts[i], "Incorrect deposited amount");
+        }
+    }
+
+    function testDepositManyFundsWithLengthMismatch() public {
+        address[] memory receivers = new address[](3);
+        receivers[0] = receiverAddress;
+        receivers[1] = receiver2Address;
+        receivers[2] = receiver3Address;
+
+        uint256[] memory amounts = new uint256[](2);
+        amounts[0] = ESCROW_AMOUNT;
+        amounts[1] = ESCROW_AMOUNT;
+
+        vm.prank(SENDER_ADDRESS);
+        vm.expectRevert(Escrow.InputsLengthMismatch.selector);
+        escrowContract.depositMany(receivers, amounts);
     }
 
     // test plan tags: 2-3, 2-4, 2-6
@@ -701,6 +760,21 @@ contract EscrowContractTest is Test {
         mockERC20.approve(address(escrowContract), amount);
         escrowContract.deposit(receiver, amount);
         vm.stopPrank();
+    }
+
+    function depositManyEscrow(address sender, address[] memory receivers, uint256[] memory amounts) public {
+        // Sets msg.sender address for next contract calls until stop is called
+        vm.startPrank(sender);
+
+        // Approve the escrow contract to transfer tokens from the sender
+        uint256 totalAmount = 0;
+        for (uint i = 0; i < amounts.length; i++) {
+            totalAmount += amounts[i];
+        }
+        mockERC20.approve(address(escrowContract), totalAmount);
+
+        escrowContract.depositMany(receivers, amounts);
+        vm.stopPrank(); 
     }
 
     function createSignedRAV(
