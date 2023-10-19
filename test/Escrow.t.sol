@@ -9,17 +9,26 @@ import {Escrow} from "../src/Escrow.sol";
 import {MockERC20Token} from "./MockERC20Token.sol";
 import {AllocationIDTracker} from "../src/AllocationIDTracker.sol";
 import {MockStaking} from "./MockStaking.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 
 contract EscrowContractTest is Test {
     address private constant SENDER_ADDRESS = address(0x789);
+
+    // Arbitrary values for testing
     uint256 private constant ESCROW_AMOUNT = 1000;
+    uint256 private constant INITIAL_SENDER_BALANCE = 10**23;
     uint256 private constant WITHDRAW_ESCROW_FREEZE_PERIOD = 800;
+    uint256 private constant INITIAL_TOKEN_BALANCE =  10**28;
     uint256 private constant REVOKE_SIGNER_FREEZE_PERIOD = 800;
+    // needs to hit minimum stake amount
+    uint256 private constant STAKE_AMOUNT = 10**23;
 
     MockERC20Token private mockERC20;
     MockStaking private staking;
     Escrow private escrowContract;
     TAPVerifier private tap_verifier;
+    AllocationIDTracker private allocationIDTracker;
+    address controller;
 
     uint256[] internal authorizedSignerPrivateKeys;
     address[] internal authorizedsigners;
@@ -29,65 +38,189 @@ contract EscrowContractTest is Test {
     address internal receiverAddress;
     address[] internal receiversAllocationIDs;
 
+    address internal deployerAddress;
+    uint256 internal deployerPrivateKey;
+
+    address governor =0x22d491Bde2303f2f43325b2108D26f1eAbA1e32b;
+    address pauseGuardian = 0x95cED938F7991cd0dFcb48F0a06a40FA1aF46EBC;
+
+    bool runIntegrationTests = false;
+
     function setUp() public {
-        // Create an instance of the TAPVerifier contract
-        tap_verifier = new TAPVerifier("TAP", "1.0.0");
+        runIntegrationTests = vm.envOr("RUN_INTEGRATION_TESTS", false);
 
-        // set up mock ERC20 token
-        mockERC20 = new MockERC20Token(1000000000);
+        console.log("Generating keys...");
+        generateKeys();
+        console.log("Keys generated.");
 
-        // set up staking contract
-        staking = new MockStaking(address(mockERC20));
+        console.log("Setting up contracts...");
+        deployContracts();
+        console.log("Contracts set up.");
 
-        // set up allocation ID tracker
-        AllocationIDTracker allocationIDTracker = new AllocationIDTracker();
+        console.log("Defining debug labels...");
+        defineDebugLabels();
+        console.log("Debug labels defined.");
 
-        // give sender tokens
-        assert(mockERC20.transfer(SENDER_ADDRESS, 10000000));
-
-        escrowContract =
-        new Escrow(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), WITHDRAW_ESCROW_FREEZE_PERIOD, REVOKE_SIGNER_FREEZE_PERIOD);
-
-        // Approve staking contract to transfer tokens from the escrow contract
+        console.log("Approving staking contract to transfer tokens from the escrow contract...");
         escrowContract.approveAll();
+        console.log("Staking contract approved.");
+
+        console.log("Transferring tokens to sender address...");
+        transferTokens();
+        console.log("Tokens transferred.");
+
+        if (runIntegrationTests) {
+            console.log("Running integration test specific set up...");
+            integrationTestSetup();
+            console.log("Set up complete.");
+        }
+
+        console.log("creating allocation...");
+        createAllocation();
+        console.log("allocation created.");
+    }
+
+    function deployContracts() public {
+        mockERC20 = MockERC20Token(vm.envOr("GRAPH_NODE_ADDRESS", address(mockERC20)));
+        staking = MockStaking(vm.envOr("STAKING_ADDRESS", address(staking)));
+        escrowContract = Escrow(vm.envOr("ESCROW_ADDRESS", address(escrowContract)));
+        tap_verifier = TAPVerifier(vm.envOr("TAP_VERIFIER_ADDRESS", address(tap_verifier)));
+        allocationIDTracker = AllocationIDTracker(vm.envOr("ALLOCATION_TRACKER_ADDRESS", address(allocationIDTracker)));
+        controller = vm.envOr("CONTROLLER_ADDRESS", address(controller));
+
+        vm.startPrank(deployerAddress);
+
+        if (address(tap_verifier) == address(0x0)){
+            // Create an instance of the TAPVerifier contract
+            tap_verifier = new TAPVerifier("TAP", "1.0.0");
+        }
+
+        if (address(mockERC20) == address(0x0)){
+            // set up mock ERC20 token
+            mockERC20 = new MockERC20Token(INITIAL_TOKEN_BALANCE);
+        }
+
+
+        if (address(staking) == address(0x0)){
+            // set up staking contract
+            staking = new MockStaking(address(mockERC20));
+        }
+
+        if (address(allocationIDTracker) == address(0x0)){
+            // set up allocation ID tracker
+            allocationIDTracker = new AllocationIDTracker();
+        }
+
+        if (address(escrowContract) == address(0x0)){
+            escrowContract =
+            new Escrow(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), WITHDRAW_ESCROW_FREEZE_PERIOD, REVOKE_SIGNER_FREEZE_PERIOD);
+        }
+        vm.stopPrank();
+    }
+
+    function generateKeys() public {
+        string memory mnemonic =
+            'myth like bonus scare over problem client lizard pioneer submit female collect';
+
+        // Set up the deployer address and derive the allocation ID
+        deployerPrivateKey = vm.deriveKey(mnemonic, 0);
+        deployerAddress = vm.addr(deployerPrivateKey);
 
         // Set up the signer to be authorized for signing rav's
-        string memory signerMnemonic =
-            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
-        authorizedSignerPrivateKeys.push(vm.deriveKey(signerMnemonic, 0));
+        authorizedSignerPrivateKeys.push(vm.deriveKey(mnemonic, 1));
         authorizedsigners.push(vm.addr(authorizedSignerPrivateKeys[0]));
 
         // Set up the signer to be authorized for signing rav's
-        string memory secondSignerMnemonic =
-            "thunder proof mule record purity unfair jump light limb ozone fade gift stay reduce menu";
-        authorizedSignerPrivateKeys.push(vm.deriveKey(secondSignerMnemonic, 0));
+        authorizedSignerPrivateKeys.push(vm.deriveKey(mnemonic, 2));
         authorizedsigners.push(vm.addr(authorizedSignerPrivateKeys[1]));
 
         // Set up the receiver address and derive the allocation ID
-        string memory receiverMnemonic =
-            "betray tornado relax hold february impact rain run nut frown bag this gravity amused math";
-        receiverPrivateKey = vm.deriveKey(receiverMnemonic, 0);
+        receiverPrivateKey = vm.deriveKey(mnemonic, 3);
         receiverAddress = vm.addr(receiverPrivateKey);
 
         // Derive the allocation IDs from the receiver Mneumonic
-        receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiverMnemonic, 1));
+        receiversAllocationIDPrivateKeys.push(vm.deriveKey(mnemonic, 4));
         receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[0]));
 
-        // Call mock staking contract to register the allocationID to the receiver address
-        staking.allocate(receiversAllocationIDs[0], receiverAddress);
-
-        receiversAllocationIDPrivateKeys.push(vm.deriveKey(receiverMnemonic, 2));
+        receiversAllocationIDPrivateKeys.push(vm.deriveKey(mnemonic, 5));
         receiversAllocationIDs.push(vm.addr(receiversAllocationIDPrivateKeys[1]));
+    }
 
+    function transferTokens() public{
+        address tokenOwner;
+        if (runIntegrationTests) {
+            address graphDeployerAddress = 0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1;
+            tokenOwner = graphDeployerAddress;
+        } else {
+            tokenOwner = deployerAddress;
+        }
+
+        // print amount of tokens token holder has
+        console.log("Token owner balance: ", mockERC20.balanceOf(tokenOwner));
+        vm.prank(tokenOwner);
+        assert(mockERC20.transfer(SENDER_ADDRESS, INITIAL_SENDER_BALANCE));
+        vm.prank(tokenOwner);
+        assert(mockERC20.transfer(receiverAddress, STAKE_AMOUNT));
+    }
+
+    function defineDebugLabels() public {
         // label all known addresses for debugging
         vm.label(SENDER_ADDRESS, "SENDER_ADDRESS");
         vm.label(receiverAddress, "receiver");
         vm.label(receiversAllocationIDs[0], "receiversAllocationID");
         vm.label(authorizedsigners[0], "authorizedsigner_0");
         vm.label(authorizedsigners[1], "authorizedsigner_1");
-        vm.label(address(escrowContract), "escrowContract");
+
         vm.label(address(mockERC20), "mockERC20");
+        vm.label(address(staking), "staking");
+        vm.label(address(escrowContract), "escrowContract");
         vm.label(address(tap_verifier), "tap_verifier");
+        vm.label(address(allocationIDTracker), "allocationIDTracker");
+    }
+
+    function createAllocation() public {
+        // Stake tokens to create an allocation
+        vm.prank(receiverAddress);
+        mockERC20.approve(address(staking), STAKE_AMOUNT);
+        vm.prank(receiverAddress);
+        staking.stake(STAKE_AMOUNT);
+        // Define arbitrary values for bytes32 and tokens
+        bytes32 arbitraryBytes32 = bytes32(uint256(123));
+        uint256 tokens = 1;
+
+        bytes memory allocationIDProof = createAllocationIDProof(
+            receiversAllocationIDs[0],
+            receiverAddress,
+            receiversAllocationIDPrivateKeys[0]
+        );
+
+        // Call mock staking contract to register the allocationID to the receiver address
+        vm.prank(receiverAddress);
+        staking.allocate(
+            arbitraryBytes32,
+            tokens,
+            receiversAllocationIDs[0],
+            arbitraryBytes32,
+            allocationIDProof
+        );
+    }
+
+    function integrationTestSetup() public {
+        // unpause the staking contract
+        // Function selector for the `setPaused(bool)` function
+        bytes4 selector = bytes4(keccak256("setPaused(bool)"));
+
+        // Prepare the calldata (function selector + parameters)
+        bytes memory data = abi.encodeWithSelector(selector, false);
+
+        // Call the contract's function using the address and calldata
+        vm.prank(pauseGuardian);
+        (bool success, ) = controller.call(data);
+        require(success, "Function call failed");
+
+        address graphDeployerAddress = 0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1;
+        vm.prank(graphDeployerAddress);
+        staking.setAssetHolder(address(escrowContract), true);
     }
 
     // test plan tags: 2-1
@@ -304,7 +437,7 @@ contract EscrowContractTest is Test {
     function testRedeemRAVSignedByAuthorizedSigner() public {
         depositEscrow(SENDER_ADDRESS, receiverAddress, ESCROW_AMOUNT);
         uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress);
-        assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
+        assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect initial escrow");
 
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
 
@@ -335,9 +468,12 @@ contract EscrowContractTest is Test {
             "Incorrect remaining escrow"
         );
 
-        // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
-        uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
-        assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
+        // the non-mocked staking contract handles collected balance differently causing this check to be invalid
+        if(!runIntegrationTests){
+            // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
+            uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
+            assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
+        }
     }
 
     // test plan tags: 3-1, 4-1, 4-3
@@ -371,9 +507,11 @@ contract EscrowContractTest is Test {
             "Incorrect remaining escrow"
         );
 
-        // get number of tokens in staking contract account after redeeming and check that it increased by the amount of remaining sender escrow
-        uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
-        assertEq(stakingBalanceAfter, stakingBalance + ESCROW_AMOUNT, "Incorrect receiver balance after redeeming");
+        if (!runIntegrationTests){
+            // get number of tokens in staking contract account after redeeming and check that it increased by the amount of remaining sender escrow
+            uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
+            assertEq(stakingBalanceAfter, stakingBalance + ESCROW_AMOUNT, "Incorrect receiver balance after redeeming");
+        }
     }
 
     // test plan tags:
@@ -414,9 +552,12 @@ contract EscrowContractTest is Test {
 
         remainingEscrow -= RAVAggregateAmount;
 
-        // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
-        uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
-        assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
+        // the non-mocked staking contract handles collected balance differently causing this check to be invalid
+        if(!runIntegrationTests){
+            // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
+            uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
+            assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
+        }
 
         assertEq(
             escrowContract.getEscrowAmount(SENDER_ADDRESS, receiverAddress),
@@ -444,7 +585,8 @@ contract EscrowContractTest is Test {
 
         // create additional sender address to test that the contract does not revert when redeeming same allocation ID with a different sender
         address secondSenderAddress = address(0xa789);
-        assert(mockERC20.transfer(secondSenderAddress, 10000000));
+        vm.prank(deployerAddress);
+        assert(mockERC20.transfer(secondSenderAddress, INITIAL_SENDER_BALANCE));
         depositEscrow(secondSenderAddress, receiverAddress, ESCROW_AMOUNT);
 
         // should not revert when redeeming same allocationID with a different sender
@@ -467,9 +609,12 @@ contract EscrowContractTest is Test {
             second_signed_rav
         );
 
-        // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
-        stakingBalanceAfter = mockERC20.balanceOf(address(staking));
-        assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
+        // the non-mocked staking contract handles collected balance differently causing this check to be invalid
+        if(!runIntegrationTests){
+            // get number of tokens in staking contract account after redeeming and check that it increased by the RAV amount
+            uint256 stakingBalanceAfter = mockERC20.balanceOf(address(staking));
+            assertEq(stakingBalanceAfter, stakingBalance + RAVAggregateAmount, "Incorrect receiver balance after redeeming");
+        }
     }
 
     function testRedeemRAVWithInvalidSignature() public {
@@ -520,6 +665,9 @@ contract EscrowContractTest is Test {
         return abi.encodePacked(r, s, v);
     }
 
+    /*
+    * Create a proof that the receiver owns the allocationID (for escrow contract/allocationIDTracker)
+    */
     function createAllocationIDOwnershipProof(
         address allocationID,
         address sender,
@@ -527,6 +675,20 @@ contract EscrowContractTest is Test {
         uint256 allocationIDPrivateKey
     ) private view returns (bytes memory) {
         bytes32 messageHash = keccak256(abi.encodePacked(block.chainid, sender, allocationID, escrowContractAddress));
+        bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(allocationIDPrivateKey, allocationIDdigest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    /*
+    * Create a proof that the receiver owns the allocationID (for staking contract)
+    */
+    function createAllocationIDProof(
+        address allocationID,
+        address receiver,
+        uint256 allocationIDPrivateKey
+    ) private pure returns (bytes memory){
+        bytes32 messageHash = keccak256(abi.encodePacked(receiver, allocationID));
         bytes32 allocationIDdigest = ECDSA.toEthSignedMessageHash(messageHash);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(allocationIDPrivateKey, allocationIDdigest);
         return abi.encodePacked(r, s, v);

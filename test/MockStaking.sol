@@ -10,15 +10,34 @@ contract MockStaking is IStaking {
     using SafeERC20 for IERC20;
 
     IERC20 private token;
+    bool private paused;
 
     mapping (address => Allocation) private allocations;
+
+    mapping (address => bool) private _assetHolders;
 
     constructor(address _token) {
         token = IERC20(_token);
     }
 
-    function allocate(address _allocationID, address _indexer) external {
-        allocations[_allocationID] = Allocation(_indexer);
+    function allocate(
+        bytes32 _subgraphDeploymentID,
+        uint256 _tokens,
+        address _allocationID,
+        bytes32 _metadata,
+        bytes calldata _proof
+    ) external {
+        // Not a real proof validation, just mocking to remove warnings
+        if(_proof.length > 0) {
+            allocations[_allocationID] =
+                Allocation(
+                    msg.sender,
+                    _subgraphDeploymentID,
+                    _tokens,
+                    _allocationID,
+                    _metadata
+                );
+        }
     }
 
     function collect(uint256 _tokens, address _allocationID) external override {
@@ -44,5 +63,14 @@ contract MockStaking is IStaking {
         returns (Allocation memory)
     {
         return allocations[_allocationID];
+    }
+
+    function stake(uint256 _tokens) external override {
+        // Pull tokens to stake from the authorized sender
+        token.safeTransferFrom(msg.sender, address(this), _tokens);
+    }
+
+    function setAssetHolder(address _assetHolder, bool _allowed)external override {
+        _assetHolders[_assetHolder] = _allowed;
     }
 }
