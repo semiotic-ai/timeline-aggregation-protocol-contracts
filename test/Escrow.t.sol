@@ -491,6 +491,30 @@ contract EscrowContractTest is Test {
         vm.stopPrank();
     }
 
+    function testThawRevertInsufficientThawAmount() public {
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
+
+        // Sets msg.sender address for next contract calls until stop is called
+        vm.startPrank(SENDER_ADDRESS);
+        vm.expectRevert(Escrow.InsufficientThawAmount.selector);
+        escrowContract.thaw(receiversAddresses[0], 0); 
+    }
+
+    function testThawRevertInsufficientEscrow() public {
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
+
+        // Sets msg.sender address for next contract calls until stop is called
+        vm.startPrank(SENDER_ADDRESS);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "InsufficientEscrow(uint256,uint256)", 
+                ESCROW_AMOUNT, 
+                100*ESCROW_AMOUNT
+            )
+        );
+        escrowContract.thaw(receiversAddresses[0], 100*ESCROW_AMOUNT); 
+    }
+
     // test plan tags: 3-1, 3-5, 3-6, 4-4
     function testRevokeAuthorizedSigner() public {
         depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
@@ -553,6 +577,58 @@ contract EscrowContractTest is Test {
         );
     }
 
+    function testCancelThawSignerSignerNotAuthorizedBySender() public {
+        vm.prank(SENDER_ADDRESS);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "SignerNotAuthorizedBySender(address,address)",
+                authorizedsigners[0],
+                address(0)
+            )
+        );
+        escrowContract.cancelThawSigner(authorizedsigners[0]);
+    }
+
+    function testThawSignerSignerNotAuthorizedBySender() public {
+        vm.prank(SENDER_ADDRESS);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "SignerNotAuthorizedBySender(address,address)",
+                authorizedsigners[0],
+                address(0)
+            )
+        );
+        escrowContract.thawSigner(authorizedsigners[0]);
+    }
+
+    function testSignerStillThawing() public {
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+
+        vm.prank(SENDER_ADDRESS);
+        escrowContract.thawSigner(authorizedsigners[0]);
+
+        (,uint256 thawEndTimestamp) = escrowContract.authorizedSigners(authorizedsigners[0]);
+        vm.prank(SENDER_ADDRESS);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "SignerStillThawing(uint256,uint256)",
+                block.number,
+                thawEndTimestamp
+            )
+        );
+        escrowContract.revokeAuthorizedSigner(authorizedsigners[0]);
+    }
+
+    function testInvalidSignerProof() public {
+        uint256 proofDeadline = block.timestamp - 1;
+        bytes memory authSignerAuthorizesSenderProof = createAuthorizedSignerProof(proofDeadline, SENDER_ADDRESS, authorizedSignerPrivateKeys[0]);
+
+        // Authorize the signer
+        vm.prank(SENDER_ADDRESS);
+        vm.expectRevert(Escrow.InvalidSignerProof.selector);
+        escrowContract.authorizeSigner(authorizedsigners[0], proofDeadline, authSignerAuthorizesSenderProof);
+    }
+
     function testInvalidAuthorizeSignerProof() public {
         // Uses the wrong signer private key to create the proof
         vm.expectRevert(Escrow.InvalidSignerProof.selector);
@@ -567,6 +643,18 @@ contract EscrowContractTest is Test {
         // expect any revert since the proof is not valid (could be invalid signer or invalid ecdsa proof)
         vm.expectRevert();
         escrowContract.authorizeSigner(authorizedsigners[0], block.timestamp+8600, invalidProof);
+    }
+
+    function testSignerAlreadyAuthorized() public {
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "SignerAlreadyAuthorized(address,address)", 
+                authorizedsigners[0],
+                SENDER_ADDRESS)
+        );
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
     }
 
     // test plan tags: 3-1
@@ -658,6 +746,24 @@ contract EscrowContractTest is Test {
         assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
     }
 
+    function testGetEscrowFromSignerAddress() public {
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
+        vm.prank(SENDER_ADDRESS); 
+        Escrow.EscrowAccount memory account = escrowContract.getEscrowAccountFromSignerAddress(authorizedsigners[0], receiversAddresses[0]);
+        assertEq(account.balance, ESCROW_AMOUNT, "Incorrect account balance");
+        assertEq(account.amountThawing, 0, "Incorrect account amountThawing");
+        assertEq(account.thawEndTimestamp, 0, "Incorrect account thawEndTimestamp");
+    }
+
+    function testSignerNotAuthorizedGetEscrowFromSignerAddress() public {
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
+
+        vm.prank(SENDER_ADDRESS);
+        vm.expectRevert(Escrow.SignerNotAuthorized.selector);
+        escrowContract.getEscrowAccountFromSignerAddress(SENDER_ADDRESS, receiversAddresses[0]);
+    }
+
     // test that the contract reverts when allocation ID is used more than once
     // test plan tags: 3-1, 2-1, 4-1, 4-5
     function testDuplicateAllocationID() public {
@@ -676,6 +782,9 @@ contract EscrowContractTest is Test {
         // get number of tokens in staking contract account before redeeming
         uint256 stakingBalance = mockERC20.balanceOf(address(staking));
 
+        // Test isAllocationIDUsed()
+        assertFalse(allocationIDTracker.isAllocationIDUsed(SENDER_ADDRESS, receiversAllocationIDs[0]));
+
         // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
         redeemSignedRAV(
             receiversAllocationIDs[0],
@@ -687,6 +796,9 @@ contract EscrowContractTest is Test {
         );
 
         remainingEscrow -= RAVAggregateAmount;
+
+        // Test isAllocationIDUsed()
+        assertTrue(allocationIDTracker.isAllocationIDUsed(SENDER_ADDRESS, receiversAllocationIDs[0]));
 
         // the non-mocked staking contract handles collected balance differently causing this check to be invalid
         if(!runIntegrationTests){
@@ -770,9 +882,35 @@ contract EscrowContractTest is Test {
         signed_rav.signature = abi.encodePacked(randomBits, randomBits, v);
 
         // Receiver redeems value from the SignedRAV, expected to revert
-        vm.expectRevert();
+        vm.expectRevert("ECDSA: invalid signature 's' value");
         redeemSignedRAV(
             receiversAllocationIDs[0],
+            receiversAllocationIDPrivateKeys[0],
+            receiversAddresses[0],
+            SENDER_ADDRESS,
+            address(escrowContract),
+            signed_rav
+        );
+    }
+
+    function testRedeemRAVInvalidProof() public {
+        depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
+        uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
+        assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
+
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+
+        // Create a signed rav
+        uint128 RAVAggregateAmount = 158;
+        uint64 timestampNs = 10;
+        TAPVerifier.SignedRAV memory signed_rav =
+            createSignedRAV(receiversAllocationIDs[0], timestampNs, RAVAggregateAmount, authorizedSignerPrivateKeys[0]);
+
+        // Receiver redeems value from the SignedRAV, expect receiver grt amount to increase
+        // We use an incorrect allocation ID to invalidate the proof
+        vm.expectRevert(AllocationIDTracker.InvalidProof.selector);
+        redeemSignedRAV(
+            receiversAllocationIDs[1],
             receiversAllocationIDPrivateKeys[0],
             receiversAddresses[0],
             SENDER_ADDRESS,

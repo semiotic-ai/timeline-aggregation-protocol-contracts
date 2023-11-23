@@ -20,6 +20,9 @@ contract MockStaking is IStaking {
         token = IERC20(_token);
     }
 
+    // add this to be excluded from coverage report
+    function test() public {}
+
     function allocate(
         bytes32 _subgraphDeploymentID,
         uint256 _tokens,
