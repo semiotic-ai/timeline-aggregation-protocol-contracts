@@ -10,6 +10,10 @@ import {Escrow} from "../src/Escrow.sol";
 
 
 contract TAPDeployScript is Script {
+
+    // add this to be excluded from coverage report
+    function test() public {}
+
     function setUp() public {}
 
     function run() public {
