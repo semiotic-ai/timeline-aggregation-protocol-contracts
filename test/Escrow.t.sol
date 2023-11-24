@@ -286,6 +286,35 @@ contract EscrowContractTest is Test {
         staking.setAssetHolder(address(escrowContract), true);
     }
 
+    function testConstructorInputValidation() public {
+        vm.startPrank(deployerAddress);
+
+        uint256 ninetyDays = 60 * 60 * 24 * 90;
+        
+        // Withdrawal escrow thawing
+        uint256 invalidWithdrawEscrowFreezePeriod = ninetyDays + 1; // 90 days + 1 second
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Escrow.WithdrawEscrowThawingTooLong.selector,
+                invalidWithdrawEscrowFreezePeriod,
+                60 * 60 * 24 * 90
+            )
+        );
+        new Escrow(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), invalidWithdrawEscrowFreezePeriod, REVOKE_SIGNER_FREEZE_PERIOD);
+        
+        // Withdrawal escrow thawing
+        uint256 invalidRevokeSignerFreezePeriod = ninetyDays + 1; // 90 days + 1 second
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Escrow.RevokeSignerThawingTooLong.selector,
+                invalidRevokeSignerFreezePeriod,
+                60 * 60 * 24 * 90
+            )
+        );
+        new Escrow(address(mockERC20), address(staking), address(tap_verifier), address(allocationIDTracker), WITHDRAW_ESCROW_FREEZE_PERIOD, invalidRevokeSignerFreezePeriod);
+        vm.stopPrank();
+    }
+
     // test plan tags: 2-1
     function testDepositFunds() public {
         depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
