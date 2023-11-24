@@ -68,6 +68,10 @@ contract Escrow {
     // The duration (in seconds) in which a signer is thawing before they can be revoked
     uint256 public immutable revokeSignerThawingPeriod;
 
+    // The maximum thawing period (in seconds) for both escrow withdrawal and signer revocation
+    // This is a precautionary measure to avoid inadvertedly locking funds for too long
+    uint256 public immutable MAX_THAWING_PERIOD = 90 days;
+
     // Custom error to indicate insufficient escrow balance
     error InsufficientEscrow(uint256 available, uint256 required);
 
@@ -112,6 +116,12 @@ contract Escrow {
 
     // Custom error to indicate inputs length mismatch
     error InputsLengthMismatch();
+
+    // Custom error to indicate thawing parameter is off bounds
+    error RevokeSignerThawingTooLong(uint256 thawingPeriod, uint256 maxThawingPeriod);
+
+    // Custom error to indicate thawing parameter is off bounds
+    error WithdrawEscrowThawingTooLong(uint256 thawingPeriod, uint256 maxThawingPeriod);
 
     /**
      * @dev Emitted when escrow is deposited for a receiver.
@@ -217,6 +227,19 @@ contract Escrow {
         uint256 withdrawEscrowThawingPeriod_,
         uint256 revokeSignerThawingPeriod_
     ) {
+        if (withdrawEscrowThawingPeriod_ > MAX_THAWING_PERIOD) {
+            revert WithdrawEscrowThawingTooLong({
+                thawingPeriod: withdrawEscrowThawingPeriod_,
+                maxThawingPeriod: MAX_THAWING_PERIOD
+            });
+        }
+        if(revokeSignerThawingPeriod_ > MAX_THAWING_PERIOD) {
+            revert RevokeSignerThawingTooLong({
+                thawingPeriod: revokeSignerThawingPeriod_,
+                maxThawingPeriod: MAX_THAWING_PERIOD
+            });
+        }
+
         escrowToken = IERC20(escrowToken_);
         staking = IStaking(staking_);
         tapVerifier = TAPVerifier(tapVerifier_);
