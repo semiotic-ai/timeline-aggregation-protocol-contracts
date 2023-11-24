@@ -360,7 +360,7 @@ contract Escrow {
 
     /**
      * @dev Requests to thaw a specific amount of escrow from a receiver's escrow account.
-     *      if requested amount is zero any thawing in progress will be cancelled. If requested
+     *      If requested amount is zero any thawing in progress will be cancelled. If requested
      *      amount is greater than zero any thawing in progress will be cancelled and a new
      *     thawing request will be initiated.
      * @param receiver Address of the receiver the escrow account is for.
@@ -507,7 +507,7 @@ contract Escrow {
     }
 
     /**
-     * @dev stops thawing a signer.
+     * @dev Stops thawing a signer.
      * @param signer Address of the signer to stop thawing.
      * @notice REVERT with error:
      *               - SignerNotAuthorizedBySender: The provided signer is either not authorized or
@@ -572,7 +572,7 @@ contract Escrow {
      * @param allocationIDProof Proof of allocationID ownership.
      * @notice If a signer or funds are in the thawing process, exercise caution. Thawing indicates upcoming removals.
      *         For in-depth understanding, refer to the respective documentation sections on thawing signers and funds.
-     * @notice will accept redeem even if escrow account balance is below RAV valueAggregate. Check escrow balance before
+     * @notice Will accept redeem even if escrow account balance is below RAV valueAggregate. Check escrow balance before
      *         redeeming to ensure expected funds are available. Only one succesfully redeem is allowed for
      *         (sender, allocationID) pair.
      * @notice REVERT: This function may revert if ECDSA.recover fails, check Open Zeppelin ECDSA library for details.
