@@ -246,13 +246,9 @@ contract Escrow {
         allocationIDTracker = AllocationIDTracker(allocationIDTracker_);
         withdrawEscrowThawingPeriod = withdrawEscrowThawingPeriod_;
         revokeSignerThawingPeriod = revokeSignerThawingPeriod_;
-    }
 
-    /**
-     * @notice Approve the staking contract to pull any amount of tokens from this contract.
-     * @dev Increased gas efficiency instead of approving on each voucher redeem
-     */
-    function approveAll() external {
+        // Approve the staking contract to pull any amount of tokens from this contract
+        // NOTE: this is done to increase gas efficiency instead of approving on each voucher redeem
         escrowToken.approve(address(staking), type(uint256).max);
     }
 
