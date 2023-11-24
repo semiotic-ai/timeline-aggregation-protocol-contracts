@@ -278,7 +278,7 @@ contract EscrowContractTest is Test {
         depositUnassignedEscrow(SENDER_ADDRESS, SENDER_ADDRESS, ESCROW_AMOUNT);
 
         vm.prank(SENDER_ADDRESS);
-        uint256 depositedAmount = escrowContract.getUnassignedEscrowAmount(SENDER_ADDRESS);
+        uint256 depositedAmount = escrowContract.unassignedAccounts(SENDER_ADDRESS);
 
         assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
     }
