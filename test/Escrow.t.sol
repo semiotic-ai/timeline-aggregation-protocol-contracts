@@ -68,10 +68,6 @@ contract EscrowContractTest is Test {
         defineDebugLabels();
         console.log("Debug labels defined.");
 
-        console.log("Approving staking contract to transfer tokens from the escrow contract...");
-        escrowContract.approveAll();
-        console.log("Staking contract approved.");
-
         console.log("Transferring tokens to sender address...");
         transferTokens();
         console.log("Tokens transferred.");
