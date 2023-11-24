@@ -651,17 +651,6 @@ contract Escrow {
     }
 
     /**
-     * @dev Retrieves the amount of unassigned escrow deposited for a sender.
-     * @param sender Address of the sender.
-     * @return The amount of escrow deposited.
-     */
-    function getUnassignedEscrowAmount(
-        address sender
-    ) external view returns (uint256) {
-        return unassignedAccounts[sender];
-    }
-
-    /**
      * @dev Verifies a proof that authorizes the sender to authorize the signer.
      * @param proof The proof provided by the signer to authorize the sender.
      * @param signer The address of the signer being authorized.
