@@ -263,7 +263,7 @@ contract Escrow {
         }
 
         uint256 totalAmount = 0;
-        for (uint i = 0; i < receivers.length; i++) {
+        for (uint256 i = 0; i < receivers.length; i++) {
             address receiver = receivers[i];
             uint256 amount = amounts[i];
 
