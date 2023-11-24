@@ -562,10 +562,10 @@ contract EscrowContractTest is Test {
             abi.encodeWithSignature(
                 "InsufficientEscrow(uint256,uint256)", 
                 ESCROW_AMOUNT, 
-                100*ESCROW_AMOUNT
+                ESCROW_AMOUNT+1
             )
         );
-        escrowContract.thaw(receiversAddresses[0], 100*ESCROW_AMOUNT); 
+        escrowContract.thaw(receiversAddresses[0], ESCROW_AMOUNT+1); 
     }
 
     // test plan tags: 3-1, 3-5, 3-6, 4-4
