@@ -6,6 +6,8 @@ solc_version = '0.8.18'
 
 [rpc_endpoints]
 goerli = "${GOERLI_RPC_URL}"
+arbitrum-sepolia = "${ARBITRUM_SEPOLIA_RPC_URL}"
 
 [etherscan]
 goerli = { key = "${ETHERSCAN_API_KEY}" }
+arbitrum-sepolia = { key = "${ETHERSCAN_API_KEY}" }
