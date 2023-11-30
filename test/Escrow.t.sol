@@ -299,101 +299,6 @@ contract EscrowContractTest is Test {
         escrowContract.depositMany(receiversAddresses, amounts);
     }
 
-    function testDepositUnassignedFunds() public {
-        depositUnassignedEscrow(SENDER_ADDRESS, SENDER_ADDRESS, ESCROW_AMOUNT);
-
-        vm.prank(SENDER_ADDRESS);
-        uint256 depositedAmount = escrowContract.unassignedAccounts(SENDER_ADDRESS);
-
-        assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount");
-    }
-
-    function testAssignDeposit() public {
-        depositUnassignedEscrow(SENDER_ADDRESS, SENDER_ADDRESS, ESCROW_AMOUNT);
-
-        uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
-        assertEq(depositedAmount, ZERO_AMOUNT, "Incorrect deposited amount");
-
-        assignDeposit(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
-
-        depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
-        assertEq(depositedAmount, ESCROW_AMOUNT, "Incorrect deposited amount"); 
-    }
-
-    function testAssignDepositWithInsufficientBalance() public {
-        depositUnassignedEscrow(SENDER_ADDRESS, SENDER_ADDRESS, ESCROW_AMOUNT);
-
-        uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
-        assertEq(depositedAmount, ZERO_AMOUNT, "Incorrect deposited amount");
-
-        vm.prank(SENDER_ADDRESS);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Escrow.InsufficientUnassignedEscrow.selector, 
-                ESCROW_AMOUNT, 
-                ESCROW_AMOUNT * 2
-            )
-        );
-        escrowContract.assignDeposit(receiversAddresses[0], ESCROW_AMOUNT * 2);
-    }
-
-    function testAssignDepositMany() public {
-        uint256[] memory amounts = new uint256[](3);
-        amounts[0] = ESCROW_AMOUNT;
-        amounts[1] = ESCROW_AMOUNT*10;
-        amounts[2] = ESCROW_AMOUNT*2;
-
-        uint256 totalAmount = 0;
-        for (uint i = 0; i < amounts.length; i++) {
-           totalAmount += amounts[i]; 
-        }
-
-        depositUnassignedEscrow(SENDER_ADDRESS, SENDER_ADDRESS, totalAmount);
-
-        assignDepositMany(SENDER_ADDRESS, receiversAddresses, amounts);
-
-        vm.prank(SENDER_ADDRESS);
-
-        for (uint i = 0; i < receiversAddresses.length; i++) {
-            uint256 depositedAmount = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[i]);
-            assertEq(depositedAmount, amounts[i], "Incorrect deposited amount");
-        }
-    }
-
-    function testAssignManyFundsWithLengthMismatch() public {
-        uint256[] memory amounts = new uint256[](2);
-        amounts[0] = ESCROW_AMOUNT;
-        amounts[1] = ESCROW_AMOUNT;
-
-        vm.prank(SENDER_ADDRESS);
-        vm.expectRevert(Escrow.InputsLengthMismatch.selector);
-        escrowContract.assignDepositMany(receiversAddresses, amounts);
-    }
-
-    function testAssignDepositManyWithInsuficientBalance() public {
-        uint256[] memory amounts = new uint256[](3);
-        amounts[0] = ESCROW_AMOUNT;
-        amounts[1] = ESCROW_AMOUNT*10;
-        amounts[2] = ESCROW_AMOUNT*2;
-
-        uint256 totalAmount = 0;
-        for (uint i = 0; i < amounts.length; i++) {
-           totalAmount += amounts[i]; 
-        }
-
-        depositUnassignedEscrow(SENDER_ADDRESS, SENDER_ADDRESS, ESCROW_AMOUNT);
-
-        vm.prank(SENDER_ADDRESS);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Escrow.InsufficientUnassignedEscrow.selector, 
-                ESCROW_AMOUNT, 
-                totalAmount
-            )
-        );
-        escrowContract.assignDepositMany(receiversAddresses, amounts);
-    }
-
     // test plan tags: 2-3, 2-4, 2-6
     function testWithdrawFundsAfterFreezePeriod() public {
         depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
@@ -1015,29 +920,6 @@ contract EscrowContractTest is Test {
 
         escrowContract.depositMany(receivers, amounts);
         vm.stopPrank(); 
-    }
-
-    function depositUnassignedEscrow(address caller, address sender, uint256 amount) public {
-        // Sets msg.sender address for next contract calls until stop is called
-        vm.startPrank(caller);
-        // Approve the escrow contract to transfer tokens from the sender
-        mockERC20.approve(address(escrowContract), amount);
-        escrowContract.depositUnassigned(sender, amount);
-        vm.stopPrank();
-    }
-
-    function assignDeposit(address sender, address receiver, uint256 amount) public {
-        // Sets msg.sender address for next contract calls until stop is called
-        vm.startPrank(sender);
-        escrowContract.assignDeposit(receiver, amount);
-        vm.stopPrank();
-    }
-
-    function assignDepositMany(address sender, address[] memory receivers, uint256[] memory amounts) public {
-        // Sets msg.sender address for next contract calls until stop is called
-        vm.startPrank(sender);
-        escrowContract.assignDepositMany(receivers, amounts);
-        vm.stopPrank();
     }
 
     function createSignedRAV(
