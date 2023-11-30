@@ -70,7 +70,7 @@ contract Escrow {
 
     // The maximum thawing period (in seconds) for both escrow withdrawal and signer revocation
     // This is a precautionary measure to avoid inadvertedly locking funds for too long
-    uint256 public immutable MAX_THAWING_PERIOD = 90 days;
+    uint256 public constant MAX_THAWING_PERIOD = 90 days;
 
     // Custom error to indicate insufficient escrow balance
     error InsufficientEscrow(uint256 available, uint256 required);
