@@ -46,10 +46,6 @@ contract Escrow {
     mapping(address signer => SenderAuthorization authorizedSigner)
         public authorizedSigners;
 
-    // Tracks unassigned escrow balance for each sender, this is escrow deposited to the contract
-    // that has not been assigned to a receiver
-    mapping(address sender => uint256 balance) public unassignedAccounts;
-
     // The ERC20 token used for escrow
     IERC20 public immutable escrowToken;
 
@@ -74,9 +70,6 @@ contract Escrow {
 
     // Custom error to indicate insufficient escrow balance
     error InsufficientEscrow(uint256 available, uint256 required);
-
-    // Custom error to indicate insufficient unassigned escrow balance
-    error InsufficientUnassignedEscrow(uint256 available, uint256 required);
 
     // Custom error to indicate insufficient thaw amount (must be greater than 0)
     error InsufficientThawAmount();
@@ -127,24 +120,6 @@ contract Escrow {
      * @dev Emitted when escrow is deposited for a receiver.
      */
     event Deposit(
-        address indexed sender,
-        address indexed receiver,
-        uint256 amount
-    );
-
-    /**
-     * @dev Emitted when escrow is deposited on a sender's unassigned account.
-     */
-    event UnassignedDeposit(
-        address indexed depositor,
-        address indexed sender,
-        uint256 amount
-    );
-
-    /**
-     * @dev Emitted when unassigned escrow is assigned to a receiver.
-     */
-    event DepositAssigned(
         address indexed sender,
         address indexed receiver,
         uint256 amount
@@ -292,89 +267,6 @@ contract Escrow {
         }
 
         escrowToken.safeTransferFrom(msg.sender, address(this), totalAmount);
-    }
-
-    /**
-     * @notice Deposits escrow without assigning a receiver.
-     * @param sender Address of the sender to be credited with the deposited amount.
-     * @param amount Amount of escrow to deposit.
-     * @dev IMPORTANT: note that any funds deposited via this function will be under
-     *      exclusive control of the sender. While it reduces the need for the sender
-     *      to manage the funds it doesn't remove their ability to withdraw them.
-     *      Use robust key management practices to ensure the security of the funds.
-     * @dev The escrow must be approved for transfer by the caller.
-     * @dev REVERT: this function will revert if the escrow transfer fails.
-     */
-    function depositUnassigned(address sender, uint256 amount) external {
-        unassignedAccounts[sender] += amount;
-        escrowToken.safeTransferFrom(msg.sender, address(this), amount);
-        emit UnassignedDeposit(msg.sender, sender, amount);
-    }
-
-    /**
-     * @notice Assigns unassigned escrow to a receiver.
-     * @param receiver Address of the receiver.
-     * @param amount Amount of escrow to assign.
-     * @dev Unassigned escrow must be previously deposited via `depositUnassigned()`.
-     * @dev REVERT: this function will revert if the sender does not have enough unassigned escrow.
-     */
-    function assignDeposit(address receiver, uint256 amount) external {
-        address sender = msg.sender;
-        uint256 unassignedBalance = unassignedAccounts[sender];
-
-        // Check sender has enough unassigned balance
-        if (unassignedBalance < amount) {
-            revert InsufficientUnassignedEscrow({
-                available: unassignedBalance,
-                required: amount
-            });
-        }
-
-        // Assign deposit
-        unassignedAccounts[sender] -= amount;
-        escrowAccounts[sender][receiver].balance += amount;
-
-        emit DepositAssigned(sender, receiver, amount);
-    }
-
-    /**
-     * @notice Assigns unassigned escrow for multiple receivers.
-     * @param receivers Array of addresses of the receivers.
-     * @param amounts Array of amounts of escrow to deposit.
-     * @notice Unassigned escrow must be previously deposited via `depositUnassigned()`.
-     * @dev REVERT: this function will revert if the sender does not have enough unassigned escrow.
-     * @dev REVERT: if the length of the receivers and amounts arrays do not match.
-     */
-    function assignDepositMany(
-        address[] calldata receivers,
-        uint256[] calldata amounts
-    ) external {
-        if (receivers.length != amounts.length) {
-            revert InputsLengthMismatch();
-        }
-
-        address sender = msg.sender;
-        uint256 unassignedBalance = unassignedAccounts[sender];
-
-        // Assign deposits
-        uint256 totalAssigned = 0;
-        for (uint256 i = 0; i < receivers.length; i++) {
-            totalAssigned += amounts[i];
-            escrowAccounts[sender][receivers[i]].balance += amounts[i];
-            emit DepositAssigned(sender, receivers[i], amounts[i]);
-        }
-
-        // Check sender has enough unassigned balance
-        // NOTE: this check is done after the deposits are assigned to avoid looping 
-        //       twice. It's expected the sender will know it's unassigned balance.
-        if (unassignedBalance < totalAssigned) {
-            revert InsufficientUnassignedEscrow({
-                available: unassignedBalance,
-                required: totalAssigned
-            });
-        }
-
-        unassignedAccounts[sender] -= totalAssigned;
     }
 
     /**
