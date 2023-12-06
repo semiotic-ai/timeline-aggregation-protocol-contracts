@@ -279,6 +279,10 @@ contract Escrow {
      * @notice Deposits escrow without assigning a receiver.
      * @param sender Address of the sender to be credited with the deposited amount.
      * @param amount Amount of escrow to deposit.
+     * @dev IMPORTANT: note that any funds deposited via this function will be under
+     *      exclusive control of the sender. While it reduces the need for the sender
+     *      to manage the funds it doesn't remove their ability to withdraw them.
+     *      Use robust key management practices to ensure the security of the funds.
      * @dev The escrow must be approved for transfer by the caller.
      * @dev REVERT: this function will revert if the escrow transfer fails.
      */

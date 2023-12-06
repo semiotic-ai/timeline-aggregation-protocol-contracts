@@ -657,7 +657,11 @@ contract EscrowContractTest is Test {
     }
 
     function testSignerStillThawing() public {
+<<<<<<< HEAD
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0], true);
+=======
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+>>>>>>> tmigone/m01-clarify-unassigned
 
         vm.prank(SENDER_ADDRESS);
         escrowContract.thawSigner(authorizedsigners[0]);
@@ -701,7 +705,11 @@ contract EscrowContractTest is Test {
     }
 
     function testSignerAlreadyAuthorized() public {
+<<<<<<< HEAD
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0], true);
+=======
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+>>>>>>> tmigone/m01-clarify-unassigned
 
         vm.expectRevert(
             abi.encodeWithSignature(
@@ -709,7 +717,11 @@ contract EscrowContractTest is Test {
                 authorizedsigners[0],
                 SENDER_ADDRESS)
         );
+<<<<<<< HEAD
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0], false);
+=======
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+>>>>>>> tmigone/m01-clarify-unassigned
     }
 
     // test plan tags: 3-1
@@ -804,7 +816,11 @@ contract EscrowContractTest is Test {
     }
 
     function testGetEscrowFromSignerAddress() public {
+<<<<<<< HEAD
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0], true);
+=======
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+>>>>>>> tmigone/m01-clarify-unassigned
         depositEscrow(SENDER_ADDRESS, receiversAddresses[0], ESCROW_AMOUNT);
         vm.prank(SENDER_ADDRESS); 
         Escrow.EscrowAccount memory account = escrowContract.getEscrowAccountFromSignerAddress(authorizedsigners[0], receiversAddresses[0]);
@@ -959,7 +975,11 @@ contract EscrowContractTest is Test {
         uint256 remainingEscrow = escrowContract.getEscrowAmount(SENDER_ADDRESS, receiversAddresses[0]);
         assertEq(remainingEscrow, ESCROW_AMOUNT, "Incorrect remaining escrow");
 
+<<<<<<< HEAD
         authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0], true);
+=======
+        authorizeSignerWithProof(SENDER_ADDRESS, authorizedSignerPrivateKeys[0], authorizedsigners[0]);
+>>>>>>> tmigone/m01-clarify-unassigned
 
         // Create a signed rav
         uint128 RAVAggregateAmount = 158;
@@ -976,12 +996,20 @@ contract EscrowContractTest is Test {
             receiversAddresses[0],
             SENDER_ADDRESS,
             address(escrowContract),
+<<<<<<< HEAD
             signed_rav,
             false
         );
     }
 
     function authorizeSignerWithProof(address sender, uint256 signerPivateKey, address signer, bool expectSucceed) private {
+=======
+            signed_rav
+        );
+    }
+
+    function authorizeSignerWithProof(address sender, uint256 signerPivateKey, address signer) private {
+>>>>>>> tmigone/m01-clarify-unassigned
         uint256 proofDeadline = block.timestamp + 86400;
         bytes memory authSignerAuthorizesSenderProof = createAuthorizedSignerProof(proofDeadline, sender, signerPivateKey);
 
