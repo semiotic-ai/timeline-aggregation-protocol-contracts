@@ -1,4 +1,9 @@
 {
+  "42161": {
+    "TAPVerifier": "0x33f9E93266ce0E108fc85DdE2f71dab555A0F05a",
+    "AllocationIDTracker": "0x5B2F33d7Ca6Ec88f5586f2528f58c20843D9FE7c",
+    "Escrow": "0x8f477709eF277d4A880801D01A140a9CF88bA0d3" 
+  },
   "421614": {
     "TAPVerifier": "0xfC24cE7a4428A6B89B52645243662A02BA734ECF",
     "AllocationIDTracker": "0xAaC28a10d707bbc6e02029f1bfDAEB5084b2aD11",
