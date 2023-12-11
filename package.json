@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@typechain/ethers-v4": "^7.0.0",
-    "abitype": "^0.10.3"
+    "abitype": "^0.10.3",
+    "ethers": "^6.9.0"
   }
 }
