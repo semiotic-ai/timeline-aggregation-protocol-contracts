@@ -4,6 +4,7 @@
   "author": "Bryan Cole <bryan.cole@semiotic.ai>",
   "license": "Apache-2.0",
   "version": "0.0.1",
+  "main": "./src/bindings.ts",
   "files": [
     "src/**/*.sol"
   ],
