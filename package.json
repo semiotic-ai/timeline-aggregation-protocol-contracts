@@ -32,7 +32,7 @@
     "lint": "solhint 'src/**/*.sol'",
     "lint:fix": "yarn prettier && solhint --fix 'src/**/*.sol'",
     "prettier": "prettier --write 'src/**/*.sol'",
-    "bindings": "typechain --target=ethers-v4 --out-dir=out/ts-bindings out/**/*.json"
+    "bindings": "typechain --target=ethers-v4 --out-dir=generated/ts-bindings out/**/*.json"
   },
   "dependencies": {
     "@typechain/ethers-v4": "^7.0.0",
