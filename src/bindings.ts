@@ -1,6 +1,6 @@
 // Copyright 2023-, Semiotic AI, Inc.
 // SPDX-License-Identifier: Apache-2.0
-import { Provider, Signer } from "ethers";
+import { providers, Signer } from "ethers";
 
 // Contract addresses
 import * as DEPLOYED_CONTRACTS from "../addresses.json";
@@ -32,7 +32,7 @@ type DeployedContracts = {
 };
 
 const connectContracts = async (
-  providerOrSigner: Provider | Signer,
+  providerOrSigner: providers.Provider | Signer,
   chainId: keyof DeployedContracts
 ): Promise<NetworkContracts> => {
   const deployedContracts = (DEPLOYED_CONTRACTS as DeployedContracts)[
