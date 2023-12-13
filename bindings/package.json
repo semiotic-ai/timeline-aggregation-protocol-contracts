@@ -1,0 +1,24 @@
+{
+  "name": "@semiotic-labs/tap-contracts-bindings",
+  "version": "1.0.0",
+  "main": "./dist/bindings/bindings.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/semiotic-ai/timeline-aggregation-protocol-contracts.git"
+  },
+  "author": "semiotic",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@typechain/ethers-v5": "^11.1.2",
+    "abitype": "^0.10.3",
+    "ethers": "5.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.4",
+    "typechain": "^8.3.2",
+    "typescript": "^5.3.3"
+  },
+  "scripts": {
+    "bindings": "typechain --target=ethers-v5 --out-dir=generated/ts-bindings ../out/**/*.json"
+  }
+}

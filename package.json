@@ -4,7 +4,6 @@
   "author": "Bryan Cole <bryan.cole@semiotic.ai>",
   "license": "Apache-2.0",
   "version": "0.0.1",
-  "main": "./src/bindings.ts",
   "files": [
     "src/**/*.sol"
   ],
@@ -16,9 +15,7 @@
     "prettier": "^2.8.8",
     "prettier-plugin-solidity": "^1.1.3",
     "solhint": "^3.4.0",
-    "solhint-plugin-prettier": "^0.0.5",
-    "typechain": "^8.3.2",
-    "typescript": "^5.3.3"
+    "solhint-plugin-prettier": "^0.0.5"
   },
   "scripts": {
     "install-libs": "make install-libs",
@@ -32,12 +29,6 @@
     "chmod-scripts": "make chmod-scripts",
     "lint": "solhint 'src/**/*.sol'",
     "lint:fix": "yarn prettier && solhint --fix 'src/**/*.sol'",
-    "prettier": "prettier --write 'src/**/*.sol'",
-    "bindings": "typechain --target=ethers-v5 --out-dir=generated/ts-bindings out/**/*.json"
-  },
-  "dependencies": {
-    "@typechain/ethers-v5": "^11.1.2",
-    "abitype": "^0.10.3",
-    "ethers": "5.7.0"
+    "prettier": "prettier --write 'src/**/*.sol'"
   }
 }

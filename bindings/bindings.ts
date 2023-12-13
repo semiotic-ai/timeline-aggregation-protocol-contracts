@@ -6,14 +6,14 @@ import { providers, Signer } from "ethers";
 import * as DEPLOYED_CONTRACTS from "../addresses.json";
 
 // Contract ABIs
-import { TAPVerifier } from "../generated/ts-bindings/TAPVerifier";
-import { AllocationIDTracker } from "../generated/ts-bindings/AllocationIDTracker";
-import { Escrow } from "../generated/ts-bindings/Escrow";
+import { TAPVerifier } from "./generated/ts-bindings/TAPVerifier";
+import { AllocationIDTracker } from "./generated/ts-bindings/AllocationIDTracker";
+import { Escrow } from "./generated/ts-bindings/Escrow";
 
 // Contract factories
-import { TAPVerifier__factory } from "../generated/ts-bindings/factories/TAPVerifier__factory";
-import { AllocationIDTracker__factory } from "../generated/ts-bindings/factories/AllocationIDTracker__factory";
-import { Escrow__factory } from "../generated/ts-bindings/factories/Escrow__factory";
+import { TAPVerifier__factory } from "./generated/ts-bindings/factories/TAPVerifier__factory";
+import { AllocationIDTracker__factory } from "./generated/ts-bindings/factories/AllocationIDTracker__factory";
+import { Escrow__factory } from "./generated/ts-bindings/factories/Escrow__factory";
 
 export { connectContracts };
 export type { NetworkContracts, DeployedContracts };
