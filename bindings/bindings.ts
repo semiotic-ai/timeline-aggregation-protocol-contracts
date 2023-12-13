@@ -15,6 +15,8 @@ import { TAPVerifier__factory } from "./generated/ts-bindings/factories/TAPVerif
 import { AllocationIDTracker__factory } from "./generated/ts-bindings/factories/AllocationIDTracker__factory";
 import { Escrow__factory } from "./generated/ts-bindings/factories/Escrow__factory";
 
+export * from "./generated/ts-bindings";
+
 export { connectContracts };
 export type { NetworkContracts, DeployedContracts };
 
