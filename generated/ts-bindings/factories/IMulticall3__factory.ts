@@ -2,19 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import { Contract, Signer } from "ethers";
-import { Provider } from "ethers/providers";
-
-import { IMulticall3 } from "../IMulticall3";
-
-export class IMulticall3__factory {
-  static connect(
-    address: string,
-    signerOrProvider: Signer | Provider
-  ): IMulticall3 {
-    return new Contract(address, _abi, signerOrProvider) as IMulticall3;
-  }
-}
+import { Contract, Signer, utils } from "ethers";
+import type { Provider } from "@ethersproject/providers";
+import type { IMulticall3, IMulticall3Interface } from "../IMulticall3";
 
 const _abi = [
   {
@@ -455,4 +445,17 @@ const _abi = [
     ],
     stateMutability: "payable",
   },
-];
+] as const;
+
+export class IMulticall3__factory {
+  static readonly abi = _abi;
+  static createInterface(): IMulticall3Interface {
+    return new utils.Interface(_abi) as IMulticall3Interface;
+  }
+  static connect(
+    address: string,
+    signerOrProvider: Signer | Provider
+  ): IMulticall3 {
+    return new Contract(address, _abi, signerOrProvider) as IMulticall3;
+  }
+}

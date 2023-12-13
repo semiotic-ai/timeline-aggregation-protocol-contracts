@@ -2,16 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import { Contract, Signer } from "ethers";
-import { Provider } from "ethers/providers";
-
-import { Script } from "../Script";
-
-export class Script__factory {
-  static connect(address: string, signerOrProvider: Signer | Provider): Script {
-    return new Contract(address, _abi, signerOrProvider) as Script;
-  }
-}
+import { Contract, Signer, utils } from "ethers";
+import type { Provider } from "@ethersproject/providers";
+import type { Script, ScriptInterface } from "../Script";
 
 const _abi = [
   {
@@ -27,4 +20,14 @@ const _abi = [
     ],
     stateMutability: "view",
   },
-];
+] as const;
+
+export class Script__factory {
+  static readonly abi = _abi;
+  static createInterface(): ScriptInterface {
+    return new utils.Interface(_abi) as ScriptInterface;
+  }
+  static connect(address: string, signerOrProvider: Signer | Provider): Script {
+    return new Contract(address, _abi, signerOrProvider) as Script;
+  }
+}

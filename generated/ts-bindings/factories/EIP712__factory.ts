@@ -2,16 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import { Contract, Signer } from "ethers";
-import { Provider } from "ethers/providers";
-
-import { EIP712 } from "../EIP712";
-
-export class EIP712__factory {
-  static connect(address: string, signerOrProvider: Signer | Provider): EIP712 {
-    return new Contract(address, _abi, signerOrProvider) as EIP712;
-  }
-}
+import { Contract, Signer, utils } from "ethers";
+import type { Provider } from "@ethersproject/providers";
+import type { EIP712, EIP712Interface } from "../EIP712";
 
 const _abi = [
   {
@@ -79,4 +72,14 @@ const _abi = [
       },
     ],
   },
-];
+] as const;
+
+export class EIP712__factory {
+  static readonly abi = _abi;
+  static createInterface(): EIP712Interface {
+    return new utils.Interface(_abi) as EIP712Interface;
+  }
+  static connect(address: string, signerOrProvider: Signer | Provider): EIP712 {
+    return new Contract(address, _abi, signerOrProvider) as EIP712;
+  }
+}

@@ -2,19 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import { Contract, Signer } from "ethers";
-import { Provider } from "ethers/providers";
-
-import { IERC5267 } from "../IERC5267";
-
-export class IERC5267__factory {
-  static connect(
-    address: string,
-    signerOrProvider: Signer | Provider
-  ): IERC5267 {
-    return new Contract(address, _abi, signerOrProvider) as IERC5267;
-  }
-}
+import { Contract, Signer, utils } from "ethers";
+import type { Provider } from "@ethersproject/providers";
+import type { IERC5267, IERC5267Interface } from "../IERC5267";
 
 const _abi = [
   {
@@ -66,4 +56,17 @@ const _abi = [
     inputs: [],
     anonymous: false,
   },
-];
+] as const;
+
+export class IERC5267__factory {
+  static readonly abi = _abi;
+  static createInterface(): IERC5267Interface {
+    return new utils.Interface(_abi) as IERC5267Interface;
+  }
+  static connect(
+    address: string,
+    signerOrProvider: Signer | Provider
+  ): IERC5267 {
+    return new Contract(address, _abi, signerOrProvider) as IERC5267;
+  }
+}

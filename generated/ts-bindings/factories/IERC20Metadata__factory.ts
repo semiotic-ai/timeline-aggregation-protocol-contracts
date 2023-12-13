@@ -2,19 +2,12 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import { Contract, Signer } from "ethers";
-import { Provider } from "ethers/providers";
-
-import { IERC20Metadata } from "../IERC20Metadata";
-
-export class IERC20Metadata__factory {
-  static connect(
-    address: string,
-    signerOrProvider: Signer | Provider
-  ): IERC20Metadata {
-    return new Contract(address, _abi, signerOrProvider) as IERC20Metadata;
-  }
-}
+import { Contract, Signer, utils } from "ethers";
+import type { Provider } from "@ethersproject/providers";
+import type {
+  IERC20Metadata,
+  IERC20MetadataInterface,
+} from "../IERC20Metadata";
 
 const _abi = [
   {
@@ -239,4 +232,17 @@ const _abi = [
     ],
     anonymous: false,
   },
-];
+] as const;
+
+export class IERC20Metadata__factory {
+  static readonly abi = _abi;
+  static createInterface(): IERC20MetadataInterface {
+    return new utils.Interface(_abi) as IERC20MetadataInterface;
+  }
+  static connect(
+    address: string,
+    signerOrProvider: Signer | Provider
+  ): IERC20Metadata {
+    return new Contract(address, _abi, signerOrProvider) as IERC20Metadata;
+  }
+}

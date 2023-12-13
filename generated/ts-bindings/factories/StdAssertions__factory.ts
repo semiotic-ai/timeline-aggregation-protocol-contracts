@@ -2,19 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import { Contract, Signer } from "ethers";
-import { Provider } from "ethers/providers";
-
-import { StdAssertions } from "../StdAssertions";
-
-export class StdAssertions__factory {
-  static connect(
-    address: string,
-    signerOrProvider: Signer | Provider
-  ): StdAssertions {
-    return new Contract(address, _abi, signerOrProvider) as StdAssertions;
-  }
-}
+import { Contract, Signer, utils } from "ethers";
+import type { Provider } from "@ethersproject/providers";
+import type { StdAssertions, StdAssertionsInterface } from "../StdAssertions";
 
 const _abi = [
   {
@@ -407,4 +397,17 @@ const _abi = [
     ],
     anonymous: false,
   },
-];
+] as const;
+
+export class StdAssertions__factory {
+  static readonly abi = _abi;
+  static createInterface(): StdAssertionsInterface {
+    return new utils.Interface(_abi) as StdAssertionsInterface;
+  }
+  static connect(
+    address: string,
+    signerOrProvider: Signer | Provider
+  ): StdAssertions {
+    return new Contract(address, _abi, signerOrProvider) as StdAssertions;
+  }
+}

@@ -2,19 +2,9 @@
 /* tslint:disable */
 /* eslint-disable */
 
-import { Contract, Signer } from "ethers";
-import { Provider } from "ethers/providers";
-
-import { IStaking } from "../IStaking";
-
-export class IStaking__factory {
-  static connect(
-    address: string,
-    signerOrProvider: Signer | Provider
-  ): IStaking {
-    return new Contract(address, _abi, signerOrProvider) as IStaking;
-  }
-}
+import { Contract, Signer, utils } from "ethers";
+import type { Provider } from "@ethersproject/providers";
+import type { IStaking, IStakingInterface } from "../IStaking";
 
 const _abi = [
   {
@@ -145,4 +135,17 @@ const _abi = [
     outputs: [],
     stateMutability: "nonpayable",
   },
-];
+] as const;
+
+export class IStaking__factory {
+  static readonly abi = _abi;
+  static createInterface(): IStakingInterface {
+    return new utils.Interface(_abi) as IStakingInterface;
+  }
+  static connect(
+    address: string,
+    signerOrProvider: Signer | Provider
+  ): IStaking {
+    return new Contract(address, _abi, signerOrProvider) as IStaking;
+  }
+}
