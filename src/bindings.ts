@@ -43,7 +43,7 @@ const connectContracts = async (
     throw new Error(`chainId: '${chainId}' has no deployed contracts`);
   }
 
-  const getContractAddress = (contractName: string) => {
+  const getContractAddress = (contractName: keyof typeof deployedContracts) => {
     if (!deployedContracts[contractName]) {
       throw new Error(
         `Deployed contract '${contractName}' is undefined for chainId: '${chainId}'`
