@@ -34,15 +34,14 @@ type DeployedContracts = {
 
 const connectContracts = async (
   providerOrSigner: providers.Provider | Signer,
-  chainId: keyof DeployedContracts
+  chainId: number
 ): Promise<NetworkContracts> => {
-  const deployedContracts = (DEPLOYED_CONTRACTS as DeployedContracts)[
-    `${chainId}`
-  ];
-
-  if (!deployedContracts) {
+  if (!(chainId in DEPLOYED_CONTRACTS))
     throw new Error(`chainId: '${chainId}' has no deployed contracts`);
-  }
+
+  const deployedContracts = DEPLOYED_CONTRACTS[
+    `${chainId}`
+  ] as DeployedContracts[421614];
 
   const getContractAddress = (contractName: keyof typeof deployedContracts) => {
     if (!deployedContracts[contractName]) {
