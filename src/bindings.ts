@@ -16,6 +16,7 @@ import { AllocationIDTracker__factory } from "../generated/ts-bindings/factories
 import { Escrow__factory } from "../generated/ts-bindings/factories/Escrow__factory";
 
 export { connectContracts };
+export type { NetworkContracts, DeployedContracts };
 
 interface NetworkContracts {
   escrow: Escrow;
