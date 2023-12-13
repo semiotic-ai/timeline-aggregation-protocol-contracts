@@ -18,30 +18,24 @@ import { Escrow__factory } from "../generated/ts-bindings/factories/Escrow__fact
 export { connectContracts };
 export type { NetworkContracts, DeployedContracts };
 
+type DeployedContracts = typeof DEPLOYED_CONTRACTS;
+
 interface NetworkContracts {
   escrow: Escrow;
   tapVerifier: TAPVerifier;
   allocationIDTracker: AllocationIDTracker;
 }
 
-type DeployedContracts = {
-  421614: {
-    TAPVerifier: "0xfC24cE7a4428A6B89B52645243662A02BA734ECF";
-    AllocationIDTracker: "0xAaC28a10d707bbc6e02029f1bfDAEB5084b2aD11";
-    Escrow: "0x1e4dC4f9F95E102635D8F7ED71c5CdbFa20e2d02";
-  };
-};
-
 const connectContracts = async (
   providerOrSigner: providers.Provider | Signer,
   chainId: number
 ): Promise<NetworkContracts> => {
-  if (!(chainId in DEPLOYED_CONTRACTS))
+  const stringifiedChainId = `${chainId}`;
+  if (!(stringifiedChainId in DEPLOYED_CONTRACTS))
     throw new Error(`chainId: '${chainId}' has no deployed contracts`);
 
-  const deployedContracts = DEPLOYED_CONTRACTS[
-    `${chainId}`
-  ] as DeployedContracts[421614];
+  const deployedContracts =
+    DEPLOYED_CONTRACTS[stringifiedChainId as keyof typeof DEPLOYED_CONTRACTS];
 
   const getContractAddress = (contractName: keyof typeof deployedContracts) => {
     if (!deployedContracts[contractName]) {
