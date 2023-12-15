@@ -6,19 +6,25 @@ import { providers, Signer } from "ethers";
 import * as DEPLOYED_CONTRACTS from "../addresses.json";
 
 // Contract ABIs
-import { TAPVerifier } from "../generated/ts-bindings/TAPVerifier";
-import { AllocationIDTracker } from "../generated/ts-bindings/AllocationIDTracker";
-import { Escrow } from "../generated/ts-bindings/Escrow";
+import { TAPVerifier } from "./generated/ts-bindings/TAPVerifier";
+import { AllocationIDTracker } from "./generated/ts-bindings/AllocationIDTracker";
+import { Escrow } from "./generated/ts-bindings/Escrow";
 
 // Contract factories
-import { TAPVerifier__factory } from "../generated/ts-bindings/factories/TAPVerifier__factory";
-import { AllocationIDTracker__factory } from "../generated/ts-bindings/factories/AllocationIDTracker__factory";
-import { Escrow__factory } from "../generated/ts-bindings/factories/Escrow__factory";
+import { TAPVerifier__factory } from "./generated/ts-bindings/factories/TAPVerifier__factory";
+import { AllocationIDTracker__factory } from "./generated/ts-bindings/factories/AllocationIDTracker__factory";
+import { Escrow__factory } from "./generated/ts-bindings/factories/Escrow__factory";
+
+export * from "./generated/ts-bindings";
 
 export { connectContracts };
 export type { NetworkContracts, DeployedContracts };
 
 type DeployedContracts = typeof DEPLOYED_CONTRACTS;
+type AddressBook = Record<
+  string,
+  { TAPVerifier: string; AllocationIDTracker: string; Escrow: string }
+>;
 
 interface NetworkContracts {
   escrow: Escrow;
@@ -28,14 +34,16 @@ interface NetworkContracts {
 
 const connectContracts = async (
   providerOrSigner: providers.Provider | Signer,
-  chainId: number
+  chainId: number,
+  addressBook: AddressBook | undefined
 ): Promise<NetworkContracts> => {
   const stringifiedChainId = `${chainId}`;
   if (!(stringifiedChainId in DEPLOYED_CONTRACTS))
     throw new Error(`chainId: '${chainId}' has no deployed contracts`);
 
-  const deployedContracts =
-    DEPLOYED_CONTRACTS[stringifiedChainId as keyof typeof DEPLOYED_CONTRACTS];
+  const deployedContracts = addressBook
+    ? addressBook[stringifiedChainId]
+    : DEPLOYED_CONTRACTS[stringifiedChainId as keyof typeof DEPLOYED_CONTRACTS];
 
   const getContractAddress = (contractName: keyof typeof deployedContracts) => {
     if (!deployedContracts[contractName]) {
