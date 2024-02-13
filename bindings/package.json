@@ -1,6 +1,6 @@
 {
   "name": "@semiotic-labs/tap-contracts-bindings",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "main": "./dist/bindings/bindings.js",
   "repository": {
     "type": "git",
@@ -22,3 +22,4 @@
     "bindings": "typechain --target=ethers-v5 --out-dir=generated/ts-bindings ../out/**/*.json"
   }
 }
+
