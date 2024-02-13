@@ -38,7 +38,7 @@ const connectContracts = async (
   addressBook: AddressBook | undefined
 ): Promise<NetworkContracts> => {
   const stringifiedChainId = `${chainId}`;
-  if (!(stringifiedChainId in DEPLOYED_CONTRACTS))
+  if( addressBook == undefined && !(stringifiedChainId in DEPLOYED_CONTRACTS) )
     throw new Error(`chainId: '${chainId}' has no deployed contracts`);
 
   const deployedContracts = addressBook
