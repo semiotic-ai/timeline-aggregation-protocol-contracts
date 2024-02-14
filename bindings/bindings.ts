@@ -21,7 +21,7 @@ export { connectContracts };
 export type { NetworkContracts, DeployedContracts };
 
 type DeployedContracts = typeof DEPLOYED_CONTRACTS;
-type AddressBook = Record<
+export type AddressBook = Record<
   string,
   { TAPVerifier: string; AllocationIDTracker: string; Escrow: string }
 >;
@@ -38,9 +38,10 @@ const connectContracts = async (
   addressBook: AddressBook | undefined
 ): Promise<NetworkContracts> => {
   const stringifiedChainId = `${chainId}`;
-  if( addressBook == undefined && !(stringifiedChainId in DEPLOYED_CONTRACTS) )
-    throw new Error(`chainId: '${chainId}' has no deployed contracts`);
-
+  if( addressBook == undefined ){
+    if (!(stringifiedChainId in DEPLOYED_CONTRACTS))
+      throw new Error(`chainId: '${chainId}' has no deployed contracts`);
+  }
   const deployedContracts = addressBook
     ? addressBook[stringifiedChainId]
     : DEPLOYED_CONTRACTS[stringifiedChainId as keyof typeof DEPLOYED_CONTRACTS];
