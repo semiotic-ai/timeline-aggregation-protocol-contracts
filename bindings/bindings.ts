@@ -21,7 +21,7 @@ export { connectContracts };
 export type { NetworkContracts, DeployedContracts };
 
 type DeployedContracts = typeof DEPLOYED_CONTRACTS;
-type AddressBook = Record<
+export type AddressBook = Record<
   string,
   { TAPVerifier: string; AllocationIDTracker: string; Escrow: string }
 >;
@@ -38,12 +38,15 @@ const connectContracts = async (
   addressBook: AddressBook | undefined
 ): Promise<NetworkContracts> => {
   const stringifiedChainId = `${chainId}`;
-  if (!(stringifiedChainId in DEPLOYED_CONTRACTS))
-    throw new Error(`chainId: '${chainId}' has no deployed contracts`);
 
-  const deployedContracts = addressBook
-    ? addressBook[stringifiedChainId]
-    : DEPLOYED_CONTRACTS[stringifiedChainId as keyof typeof DEPLOYED_CONTRACTS];
+  const deployedContracts = (() => {
+    if (addressBook !== undefined) return addressBook[stringifiedChainId];
+
+    if (chainIdHasContracts(stringifiedChainId))
+      return DEPLOYED_CONTRACTS[stringifiedChainId];
+
+    throw new Error(`chainId: '${chainId}' has no deployed contracts`);
+  })();
 
   const getContractAddress = (contractName: keyof typeof deployedContracts) => {
     if (!deployedContracts[contractName]) {
@@ -78,3 +81,12 @@ const connectContracts = async (
 
   return contracts;
 };
+
+/**
+ * Checks if a given chainId has contracts deployed.
+ * @param chainId The chainId to check.
+ * @returns A boolean indicating if the chainId has contracts deployed.
+ */
+const chainIdHasContracts = (
+  chainId: string
+): chainId is keyof DeployedContracts => chainId in DEPLOYED_CONTRACTS;
