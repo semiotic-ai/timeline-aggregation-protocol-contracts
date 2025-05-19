@@ -32,3 +32,10 @@ With the bindings generated, you may publish to npm using the following command:
 ```
 npm publish
 ```
+
+You must have the relevant access permissions to publish this crate.
+You can check these by seeing whether `tap-contracts-bindings` is listed as `read-write` under
+
+``` shell
+npm access list packages
+```
