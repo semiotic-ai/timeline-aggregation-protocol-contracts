@@ -9,9 +9,9 @@
   "author": "semiotic",
   "license": "Apache-2.0",
   "dependencies": {
-    "@typechain/ethers-v5": "^11.1.2",
+    "@typechain/ethers-v6": "^0.5.1",
     "abitype": "^0.10.3",
-    "ethers": "5.7.0"
+    "ethers": "6.13.7"
   },
   "devDependencies": {
     "@types/node": "^20.10.4",
@@ -19,7 +19,7 @@
     "typescript": "^5.3.3"
   },
   "scripts": {
-    "bindings": "typechain --target=ethers-v5 --out-dir=generated/ts-bindings ../out/**/*.json"
+    "bindings": "typechain --target=ethers-v6 --out-dir=generated/ts-bindings ../out/**/*.json"
   }
 }
 

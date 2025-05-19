@@ -1,6 +1,6 @@
 // Copyright 2023-, Semiotic AI, Inc.
 // SPDX-License-Identifier: Apache-2.0
-import { providers, Signer } from "ethers";
+import { Provider, Signer } from "ethers";
 
 // Contract addresses
 import * as DEPLOYED_CONTRACTS from "../addresses.json";
@@ -33,7 +33,7 @@ interface NetworkContracts {
 }
 
 const connectContracts = async (
-  providerOrSigner: providers.Provider | Signer,
+  providerOrSigner: Provider | Signer,
   chainId: number,
   addressBook: AddressBook | undefined
 ): Promise<NetworkContracts> => {
