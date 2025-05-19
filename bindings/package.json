@@ -19,7 +19,6 @@
     "typescript": "^5.3.3"
   },
   "scripts": {
-    "bindings": "typechain --target=ethers-v6 --out-dir=generated/ts-bindings ../out/**/*.json"
+    "bindings": "typechain --target=ethers-v6 --out-dir=generated/ts-bindings ../out/**/!(*.t).sol/*.json"
   }
 }
-
