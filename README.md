@@ -2,7 +2,13 @@
 
 ## Create types and bindings
 
-First, use forge to build the smart contracts:
+First, start [forge](https://book.getfoundry.sh/getting-started/installation). If you don't already have it installed, make sure you restart your shell.
+
+``` shell
+foundryup
+```
+
+Next, build the smart contracts.
 
 ```
 yarn build
