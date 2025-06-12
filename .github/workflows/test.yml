@@ -36,3 +36,40 @@ jobs:
         run: |
           forge test -vvv
         id: test
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Setup Node.js and install nvm
+        run: |
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          
+          # Install Node 16 and yarn for Graph contracts
+          nvm install 16
+          nvm use 16
+          npm install -g yarn
+          
+          # Install Node 18 and yarn for TAP contracts  
+          nvm install 18
+          nvm use 18
+          npm install -g yarn
+
+      - name: Run Integration Tests
+        run: |
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+          chmod +x scripts/integration_tests.sh
+          ./scripts/integration_tests.sh --run-integration-tests
