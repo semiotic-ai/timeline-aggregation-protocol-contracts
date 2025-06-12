@@ -597,7 +597,7 @@ contract EscrowContractTest is Test {
         vm.expectRevert(
             abi.encodeWithSignature(
                 "SignerStillThawing(uint256,uint256)",
-                block.number,
+                block.timestamp,
                 thawEndTimestamp
             )
         );
