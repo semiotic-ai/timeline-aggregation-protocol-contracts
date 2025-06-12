@@ -62,6 +62,11 @@ deploy_graph_contracts() {
     # Hardhat requires an older version of node
     nvm install 16.0.0
     nvm use 16.0.0
+    # Install yarn if not available
+    if ! command -v yarn &> /dev/null; then
+        echo "Installing yarn for Node 16.0.0..."
+        npm install -g yarn
+    fi
     yarn
     yes | yarn deploy-localhost --auto-mine
     export GRAPH_NODE_ADDRESS="$(jq '.["1337"].GraphToken.address' addresses.json | tr -d '"' || error_exit "Error obtaining Graph Node address")"
@@ -74,22 +79,33 @@ deploy_graph_contracts() {
 deploy_tap_contracts() {
     cd "$tap_contracts"
     echo "Starting deploy for TAP contracts located in $PWD"
+    # Switch back to a newer Node version for TAP contracts
+    nvm install 18
+    nvm use 18
+    # Install yarn if not available in Node 18
+    if ! command -v yarn &> /dev/null; then
+        echo "Installing yarn for Node 18..."
+        npm install -g yarn
+    fi
+
     export WITHDRAW_ESCROW_FREEZE_PERIOD=800
     export REVOKE_SIGNER_FREEZE_PERIOD=800
+    # Set dummy ETHERSCAN_API_KEY to avoid verification errors
+    export ETHERSCAN_API_KEY="dummy_key_for_local_testing"
     yarn
     export ALLOCATION_TRACKER_ADDRESS=$(forge create \
         --unlocked --from $DEPLOYER \
-        --rpc-url localhost:8545 src/AllocationIDTracker.sol:AllocationIDTracker --json \
+        --rpc-url localhost:8545 src/AllocationIDTracker.sol:AllocationIDTracker --json --broadcast \
         | jq -Rr 'fromjson? | .deployedTo')
     export TAP_VERIFIER_ADDRESS=$(forge create \
         --unlocked --from $DEPLOYER \
         --rpc-url localhost:8545 src/TAPVerifier.sol:TAPVerifier \
-        --constructor-args 'tapVerifier' '1.0' --json \
+        --constructor-args 'tapVerifier' '1.0' --json --broadcast \
         | jq -Rr 'fromjson? | .deployedTo')
     export ESCROW_ADDRESS=$(forge create \
         --unlocked --from $DEPLOYER \
         --rpc-url localhost:8545 src/Escrow.sol:Escrow \
-        --constructor-args $GRAPH_NODE_ADDRESS $STAKING_ADDRESS $TAP_VERIFIER_ADDRESS $ALLOCATION_TRACKER_ADDRESS $WITHDRAW_ESCROW_FREEZE_PERIOD $REVOKE_SIGNER_FREEZE_PERIOD --json \
+        --constructor-args $GRAPH_NODE_ADDRESS $STAKING_ADDRESS $TAP_VERIFIER_ADDRESS $ALLOCATION_TRACKER_ADDRESS $WITHDRAW_ESCROW_FREEZE_PERIOD $REVOKE_SIGNER_FREEZE_PERIOD --json --broadcast \
         | jq -Rr 'fromjson? | .deployedTo')
     echo "TAP contracts deployed"
     cd -
@@ -105,6 +121,8 @@ main() {
 
     if $RUN_INTEGRATION_TESTS; then
         echo "Running integration tests..."
+        # Set ETHERSCAN_API_KEY for testing to avoid verification errors
+        export ETHERSCAN_API_KEY="dummy_key_for_local_testing"
         #run integration tests...
         forge test --match-contract EscrowContractTest --rpc-url localhost:8545
     else
